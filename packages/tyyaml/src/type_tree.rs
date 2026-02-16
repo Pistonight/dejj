@@ -7,24 +7,29 @@ pub enum Tree<Repr> {
     ///
     /// TyYAML representation is `[ TYPE_ID ]`
     Base(Repr),
+
     /// An array type
     ///
     /// TyYAML representation is `[ TYPE_ID,[LEN] ]`
     Array(Box<Self>, u32),
+
     /// A pointer type
     ///
     /// TyYAML representation is `[ TYPE_ID,'*' ]`
     Ptr(Box<Self>),
+
     /// A subroutine type
     ///
     /// TyYAML representation is `[ RET_TYPE_ID,'()',[ ARG_TYPE, ... ] ]`.
     /// Note that this must be wrapped
     /// in a pointer to form a pointer-to-subroutine (i.e. function pointer) type.
     Sub(Vec<Self> /*[retty, args...]*/),
+
     /// A pointer-to-member-data type
     ///
     /// TyYAML representation is `[ VALUE_TYPE_ID,CLASS_TYPE_ID,'::','*' ]`
     Ptmd(Repr /*base*/, Box<Self> /*pointee*/),
+
     /// A pointer-to-member-function type
     ///
     /// TyYAML representation is `[ VALUE_TYPE_ID,CLASS_TYPE_ID,'::','()',[ ARG_TYPE, ...],'*' ]`
@@ -240,17 +245,26 @@ impl<Repr> Tree<Repr> {
                 Ok(Self::to_replaced_impl_vec(x, f)?.map(Tree::Sub))
             }
             Tree::Ptmd(base, x) => {
-                todo!() // Tree::Base case
-                if f(base).is_some() {
-                    cu::bail!("ptmd base type cannot be replaced with tree! check if the type is replacable before calling to_replaced");
+                match f(base) {
+                    None => Ok(x.to_replaced_impl(f)?.map(|new_x| Self::ptmd(base.clone(), new_x))),
+                    Some(Tree::Base(base)) => {
+                    Ok(x.to_replaced_impl(f)?.map(|new_x| Self::ptmd(base, new_x)))
+                    },
+                    _ => {
+                        cu::bail!("ptmd base type cannot be replaced with tree! check if the type is replacable before calling to_replaced");
+                    }
                 }
-                Ok(x.to_replaced_impl(f)?.map(|new_x| Self::ptmd(base.clone(), new_x)))
             }
             Tree::Ptmf(base, x) => {
-                if f(base).is_some() {
-                    cu::bail!("ptmf base type cannot be replaced with tree! check if the type is replacable before calling to_replaced");
+                match f(base) {
+                    None => Ok(Self::to_replaced_impl_vec(x, f)?.map(|new_x| Self::ptmf(base.clone(), new_x))),
+                    Some(Tree::Base(base)) => {
+                        Ok(Self::to_replaced_impl_vec(x, f)?.map(|new_x| Self::ptmf(base, new_x)))
+                    }
+                    _ => {
+                        cu::bail!("ptmf base type cannot be replaced with tree! check if the type is replacable before calling to_replaced");
+                    }
                 }
-                Ok(Self::to_replaced_impl_vec(x, f)?.map(|new_x| Self::ptmf(base.clone(), new_x)))
             }
         }
     }

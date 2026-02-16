@@ -31,20 +31,20 @@ pub fn load(path: impl AsRef<Path>) -> cu::Result<Config> {
     config.extract.name_resolution.test_rules()?;
     match config.extract.pointer_width {
         8 | 16 | 32 | 64 => {}
-        _ => cu::bailfyi!("invalid config.extract.pointer-width. must be 8, 16, 32 or 64"),
+        _ => cu::bail!("invalid config.extract.pointer-width. must be 8, 16, 32 or 64"),
     }
 
     if Prim::Void == config.extract.ptmf_repr.0 {
-        cu::bailfyi!("PTMF repr type must be sized");
+        cu::bail!("PTMF repr type must be sized");
     }
     if config.extract.ptmf_repr.1 == 0 {
-        cu::bailfyi!("PTMF repr type must be non-zero size");
+        cu::bail!("PTMF repr type must be non-zero size");
     }
     if Prim::Void == config.extract.ptmd_repr.0 {
-        cu::bailfyi!("PTMD repr type must be sized");
+        cu::bail!("PTMD repr type must be sized");
     }
     if config.extract.ptmd_repr.1 == 0 {
-        cu::bailfyi!("PTMD repr type must be non-zero size");
+        cu::bail!("PTMD repr type must be non-zero size");
     }
 
     Ok(config)

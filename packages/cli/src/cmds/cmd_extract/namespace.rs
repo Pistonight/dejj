@@ -1,5 +1,4 @@
-use std::collections::BTreeSet;
-use std::{collections::BTreeMap, sync::Arc};
+use std::collections::{BTreeSet, BTreeMap};
 
 use cu::pre::*;
 use tyyaml::Prim;
@@ -46,7 +45,7 @@ pub fn load_namespaces(unit: &Unit) -> cu::Result<NamespaceMaps> {
                 cu::ensure!(
                     existing.source_segs_equal(namespace),
                     "namespace with the same source does not have the same segments: {existing:?} and {namespace:?}"
-                )
+                )?;
             }
         }
     }
@@ -192,10 +191,6 @@ impl NamespacedName {
         &self.1
     }
 
-    pub fn basename_owned(&self) -> Arc<str> {
-        Arc::clone(&self.1)
-    }
-
     pub fn namespace(&self) -> &Namespace {
         &self.0
     }
@@ -237,7 +232,7 @@ impl Namespace {
         cu::ensure!(
             !s.contains(['<', '>', '*', '&']),
             "Namespace::parse_untemplated: cannot parse templated namespace: {s}"
-        );
+        )?;
         Ok(Self(s.split("::").map(|x| NameSeg::Name(x.trim().into())).collect()))
     }
     pub fn is_empty(&self) -> bool {

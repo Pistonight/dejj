@@ -1,3 +1,4 @@
+// #![allow(unused)]
 pub mod cmds;
 mod config;
 mod demangler;

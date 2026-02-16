@@ -3,22 +3,20 @@ use cu::pre::*;
 use super::pre::*;
 
 pub async fn run_stage2_serial(mut stages: Vec<Stage1>) -> cu::Result<Stage1> {
-    cu::ensure!(!stages.is_empty(), "no CUs to merge");
+    cu::ensure!(!stages.is_empty(), "no CUs to merge")?;
     let stage = {
         let total = stages.len() - 1;
-        let bar = cu::progress_bar(total, "stage1 -> stage2: merging types");
+        let bar = cu::progress("stage1 -> stage2: merging types").keep(false).total(total).spawn();
         let pool = cu::co::pool(-1);
         let mut handles = Vec::with_capacity(total / 2 + 1);
         while let Some(handle) = spawn_task(&mut stages, &pool) {
             handles.push(handle);
         }
 
-        let mut count = 0;
         let mut set = cu::co::set(handles);
         while let Some(result) = set.next().await {
             let merged = result??;
-            count += 1;
-            cu::progress!(&bar, count);
+            cu::progress!(bar += 1);
             stages.push(merged);
             if let Some(handle) = spawn_task(&mut stages, &pool) {
                 set.add(handle);
@@ -32,7 +30,7 @@ pub async fn run_stage2_serial(mut stages: Vec<Stage1>) -> cu::Result<Stage1> {
             symbol.mark(&mut marked);
         }
         super::super::garbage_collector::mark_and_sweep(marked, &mut stage.types, Type1::mark);
-        cu::progress_done!(&bar, "stage2: merged into {} types", stage.types.len());
+        cu::info!("stage2: merged into {} types", stage.types.len());
         stage
     };
 

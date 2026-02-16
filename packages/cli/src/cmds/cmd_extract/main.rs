@@ -26,12 +26,12 @@ pub fn run(config: Config) -> cu::Result<()> {
 async fn run_internal(config: Config) -> cu::Result<()> {
     let config = Arc::new(config);
 
-    let build_bin = cu::check!(
-        config.extract.build_command.first(),
-        "missing extract.build-command in config"
-    )?;
     {
-        let (child, _, _) = Path::new(build_bin)
+        let build_bin = cu::check!(
+            config.extract.build_command.first(),
+            "missing extract.build-command in config"
+        )?;
+        let (child, _, bar) = Path::new(build_bin)
             .command()
             .args(config.extract.build_command.iter().skip(1))
             .current_dir(&config.paths.build_dir)
@@ -40,6 +40,7 @@ async fn run_internal(config: Config) -> cu::Result<()> {
             .co_spawn()
             .await?;
         child.co_wait_nz().await?;
+        bar.done();
     }
 
     cu::fs::make_dir(&config.paths.extract_output)?;
@@ -81,7 +82,7 @@ async fn run_internal(config: Config) -> cu::Result<()> {
     };
 
     let stage0 = {
-        let bar = cu::progress_bar(units.len(), "stage0: loading types");
+        let bar = cu::progress("stage0: loading types").keep(false).total(units.len()).spawn();
         let mut handles = Vec::with_capacity(units.len());
         let pool = cu::co::pool(-1);
         let mut output = Vec::with_capacity(units.len());
@@ -98,23 +99,21 @@ async fn run_internal(config: Config) -> cu::Result<()> {
         }
 
         let mut set = cu::co::set(handles);
-        let mut count = 0;
         let mut type_count = 0;
         while let Some(result) = set.next().await {
             let stage = result??;
-            count += 1;
             type_count += stage.types.len();
-            cu::progress!(&bar, count, "{}", stage.name);
+            cu::progress!(bar += 1, "{}", stage.name);
             output.push(stage);
         }
-        cu::progress_done!(&bar, "stage0: loaded {type_count} types");
-        drop(bar);
+        cu::info!("stage0: loaded {type_count} types");
         output.sort_unstable_by_key(|x| x.offset);
         output
     };
 
     let stage1 = {
-        let bar = cu::progress_bar(stage0.len(), "stage0 -> stage1: reducing types");
+        let bar = cu::progress("stage0 -> stage1: reducing types").keep(false)
+        .total(stage0.len()).spawn();
         let mut handles = Vec::with_capacity(stage0.len());
         let pool = cu::co::pool(-1);
         let mut output = Vec::with_capacity(stage0.len());
@@ -128,16 +127,14 @@ async fn run_internal(config: Config) -> cu::Result<()> {
         }
 
         let mut set = cu::co::set(handles);
-        let mut count = 0;
         let mut type_count = 0;
         while let Some(result) = set.next().await {
             let stage = result??;
-            count += 1;
             type_count += stage.types.len();
-            cu::progress!(&bar, count, "{}", stage.name);
+            cu::progress!(bar += 1, "{}", stage.name);
             output.push(stage);
         }
-        cu::progress_done!(&bar, "stage1: reduced into {type_count} types");
+        cu::info!("stage1: reduced into {type_count} types");
         drop(bar);
         output.sort_unstable_by_key(|x| x.offset);
         output

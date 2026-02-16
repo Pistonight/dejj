@@ -87,8 +87,8 @@ impl SizeResolver {
                         size
                     }
                 };
-                cu::ensure!(size != 0, "unexpected zero-sized enum: {goff}");
-                cu::ensure!(size != UNSIZED, "unexpected unsized enum: {goff}");
+                cu::ensure!(size != 0, "unexpected zero-sized enum: {goff}")?;
+                cu::ensure!(size != UNSIZED, "unexpected unsized enum: {goff}")?;
                 size
             }
             Type0::EnumDecl(_, _) => {
@@ -110,9 +110,9 @@ impl SizeResolver {
                 cu::ensure!(
                     max_size == size,
                     "unexpected union size mismatch: largest member size is 0x{max_size:x}, but self size is 0x{size:x}"
-                );
-                cu::ensure!(size != 0, "unexpected zero-sized union: {goff}");
-                cu::ensure!(size != UNSIZED, "unexpected unsized union: {goff}");
+                )?;
+                cu::ensure!(size != 0, "unexpected zero-sized union: {goff}")?;
+                cu::ensure!(size != UNSIZED, "unexpected unsized union: {goff}")?;
                 size
             }
             Type0::UnionDecl(_, _) => {
@@ -120,8 +120,8 @@ impl SizeResolver {
             }
             Type0::Struct(_, data) => {
                 let size = data.byte_size;
-                cu::ensure!(size != 0, "unexpected zero-sized struct: {goff}");
-                cu::ensure!(size != UNSIZED, "unexpected unsized struct: {goff}");
+                cu::ensure!(size != 0, "unexpected zero-sized struct: {goff}")?;
+                cu::ensure!(size != UNSIZED, "unexpected unsized struct: {goff}")?;
                 size
             }
             Type0::StructDecl(_, _) => {
@@ -138,7 +138,7 @@ impl SizeResolver {
         };
 
         // insert the actual size
-        cu::ensure!(size != RESOLVING, "unexpected invalid size for type {goff}");
+        cu::ensure!(size != RESOLVING, "unexpected invalid size for type {goff}")?;
         self.sizes.insert(goff, size);
         Ok(size)
     }
@@ -150,12 +150,12 @@ impl SizeResolver {
             }
             Tree::Array(elemty, len) => {
                 let len = *len;
-                cu::ensure!(len != 0, "unexpected 0-length array");
+                cu::ensure!(len != 0, "unexpected 0-length array")?;
                 let elem_size = cu::check!(
                     self.get_tree_size(elemty, stage0),
                     "failed to resolve array element size"
                 )?;
-                cu::ensure!(elem_size != UNSIZED, "array element must be sized");
+                cu::ensure!(elem_size != UNSIZED, "array element must be sized")?;
                 Ok(elem_size * (len as u32))
             }
             Tree::Ptr(_) => Ok(*self.sizes.get(&Goff::pointer()).unwrap()),

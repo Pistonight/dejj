@@ -389,7 +389,7 @@ fn load_union_type_from_entry(entry: &Die<'_, '_>, ctx: &mut LoadTypeCtx) -> cu:
                 cu::ensure!(
                     entry.vtable_index()?.is_none(),
                     "unsupported virtual function in union at {offset}"
-                );
+                )?;
             }
             tag => {
                 cu::bail!("unexpected tag {tag} at {offset} while processing union");
@@ -470,7 +470,7 @@ fn load_struct_type_from_entry(entry: &Die<'_, '_>, ctx: &mut LoadTypeCtx) -> cu
                 cu::ensure!(
                     member_offset < u32::MAX as u64,
                     "member_offset is too big for member at {offset}. This is unlikely to be correct."
-                );
+                )?;
                 let member_offset = member_offset as u32;
 
                 // for vfptr fields, we change the loaded type to pointer primitive,
@@ -482,7 +482,7 @@ fn load_struct_type_from_entry(entry: &Die<'_, '_>, ctx: &mut LoadTypeCtx) -> cu
                     cu::ensure!(
                         member_offset == 0,
                         "unexpected vfptr field at non-zero offset, for member at {offset}"
-                    );
+                    )?;
                     Member {
                         offset: 0,
                         name: None,
@@ -513,7 +513,7 @@ fn load_struct_type_from_entry(entry: &Die<'_, '_>, ctx: &mut LoadTypeCtx) -> cu
                     cu::ensure!(
                         bitfield_byte_size < u32::MAX as u64,
                         "bitfield_byte_size is too big for member at {offset}. This is unlikely to be correct."
-                    );
+                    )?;
                     member.special = Some(SpecialMember::Bitfield(bitfield_byte_size as u32));
                     // can merge with last member if it's the same bitfield
                     if let Some(prev) = members.last_mut() {
@@ -533,7 +533,7 @@ fn load_struct_type_from_entry(entry: &Die<'_, '_>, ctx: &mut LoadTypeCtx) -> cu
                 cu::ensure!(
                     member_offset < u32::MAX as u64,
                     "member_offset is too big for base class at {offset}. This is unlikely to be correct."
-                );
+                )?;
                 let member_offset = member_offset as u32;
                 let type_loff = cu::check!(
                     entry.loff_opt(DW_AT_type),
@@ -696,7 +696,7 @@ fn load_array_subrange_count(entry: &Die<'_, '_>) -> cu::Result<Option<u32>> {
                         cu::ensure!(
                             count < u32::MAX as u64,
                             "array length is too big: {count}. This is unlikely to be correct."
-                        );
+                        )?;
                         Some(count as u32)
                     }
                 };
@@ -709,7 +709,7 @@ fn load_array_subrange_count(entry: &Die<'_, '_>) -> cu::Result<Option<u32>> {
     cu::ensure!(
         found_subrange,
         "did not find DW_TAG_subrange_type for array type at {offset}"
-    );
+    )?;
     Ok(count)
 }
 
@@ -808,7 +808,7 @@ fn load_func_symbol_at<'a, 'b>(node: DieNode<'a, 'b>, ctx: &mut LoadSymbolCtx) -
         cu::ensure!(
             is_inlined,
             "function at {offset} is not inlined and does not have low_pc"
-        );
+        )?;
     }
 
     let mut types = vec![];

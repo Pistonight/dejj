@@ -46,7 +46,7 @@ impl TreeRepr for Ty {
 
     fn deserialize_spec(spec: &str) -> cu::Result<Self> {
         if spec.starts_with('"') {
-            cu::ensure!(spec.ends_with('"'), "unterminated quoted Ty spec: '{spec}'");
+            cu::ensure!(spec.ends_with('"'), "unterminated quoted Ty spec: '{spec}'")?;
             return Ok(Ty::Named(spec[1..spec.len() - 1].to_string()));
         }
         cu::check!(

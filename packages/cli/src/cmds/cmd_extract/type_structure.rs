@@ -182,10 +182,10 @@ impl Type1 {
     pub fn add_merge_deps(&self, other: &Self, task: &mut MergeTask) -> cu::Result<()> {
         match (self, other) {
             (Type1::Prim(a), Type1::Prim(b)) => {
-                cu::ensure!(a == b);
+                cu::ensure!(a == b)?;
             }
             (Type1::Enum(_, a, _), Type1::Enum(_, b, _)) => {
-                cu::ensure!(a == b, "cannot merge 2 enums of different enumerators or sizes");
+                cu::ensure!(a == b, "cannot merge 2 enums of different enumerators or sizes")?;
             }
             (Type1::Enum(_, _, _), Type1::EnumDecl(_, _)) => {}
             (Type1::EnumDecl(_, _), Type1::Enum(_, _, _)) => {}
@@ -221,13 +221,13 @@ impl Type1 {
         }
         match (self, other) {
             (Type1::Prim(a), Type1::Prim(b)) => {
-                cu::ensure!(a == b);
+                cu::ensure!(a == b)?;
                 Ok(Type1::Prim(*a))
             }
             // prefer primitive types
             (Type1::Prim(a), _) | (_, Type1::Prim(a)) => Ok(Type1::Prim(*a)),
             (Type1::Enum(name_a, a, other_names_a), Type1::Enum(name_b, b, other_names_b)) => {
-                cu::ensure!(a == b, "cannot merge 2 enums of different enumerators or sizes");
+                cu::ensure!(a == b, "cannot merge 2 enums of different enumerators or sizes")?;
                 let mut other_names = BTreeSet::new();
                 other_names.extend(other_names_a.clone());
                 other_names.extend(other_names_b.clone());
@@ -357,6 +357,18 @@ impl Type1 {
                 }
                 false
             }
+        }
+    }
+
+    pub fn mark_ptm_base(&self, marked: &mut GoffSet) {
+        match self {
+            Type1::Union(_, data, names) => todo!(),
+            Type1::Struct(_, data, names) => todo!(),
+            Type1::Prim(_) => {}
+            Type1::Enum(_, _, _) => {}
+            Type1::EnumDecl(namespaced_templated_name, namespaced_templated_names) => todo!(),
+            Type1::UnionDecl(namespaced_templated_name, namespaced_templated_names) => todo!(),
+            Type1::StructDecl(namespaced_templated_name, namespaced_templated_names) => todo!(),
         }
     }
 
@@ -526,14 +538,14 @@ impl Type1Enum {
             "cannot merge 2 enums of different byte size: 0x{:x} != 0x{:x}",
             self.byte_size,
             other.byte_size
-        );
+        )?;
         // we don't have any "partial definitions" for enums observed yet
         cu::ensure!(
             self.enumerators == other.enumerators,
             "cannot merge 2 enums of different enumerators: {:#?}, and {:#?}",
             self.enumerators,
             other.enumerators
-        );
+        )?;
         Ok(())
     }
 }
@@ -594,11 +606,11 @@ impl Type0Union {
         cu::ensure!(
             self.byte_size == other.byte_size,
             "unions of different sizes cannot be merged"
-        );
+        )?;
         cu::ensure!(
             self.template_args.len() == other.template_args.len(),
             "unions of different template arg count cannot be merged"
-        );
+        )?;
         for (a, b) in std::iter::zip(&self.template_args, &other.template_args) {
             cu::check!(
                 a.add_merge_deps(b, task),
@@ -608,7 +620,7 @@ impl Type0Union {
         cu::ensure!(
             self.members.len() == other.members.len(),
             "unions of different member count cannot be merged"
-        );
+        )?;
         for (a, b) in std::iter::zip(&self.members, &other.members) {
             cu::check!(a.add_merge_deps(b, task), "add_merge_deps failed for union members")?;
         }
@@ -677,11 +689,11 @@ impl Type0Struct {
             "structs of different sizes cannot be merged (0x{:x} != 0x{:x})",
             self.byte_size,
             other.byte_size
-        );
+        )?;
         cu::ensure!(
             self.template_args.len() == other.template_args.len(),
             "structs of different template arg count cannot be merged"
-        );
+        )?;
         for (a, b) in std::iter::zip(&self.template_args, &other.template_args) {
             cu::check!(
                 a.add_merge_deps(b, task),
@@ -711,7 +723,7 @@ impl Type0Struct {
         cu::ensure!(
             self.members.len() == other.members.len(),
             "structs of different member count cannot be merged"
-        );
+        )?;
         for (a, b) in std::iter::zip(&self.members, &other.members) {
             cu::check!(a.add_merge_deps(b, task), "add_merge_deps failed for struct members")?;
         }
@@ -731,7 +743,7 @@ impl Type0Struct {
                         "cannot merge vtable dtor entries of different names: {:?} and {:?}",
                         other_entry.name,
                         self_entry.name
-                    );
+                    )?;
                 } else {
                     new_vtable.push((*i, other_entry.clone()));
                 }
@@ -743,7 +755,7 @@ impl Type0Struct {
                     "cannot merge vtable entries of different names, at index {i}: {:?} and {:?}",
                     other_entry.name,
                     self_entry.name
-                );
+                )?;
             } else {
                 new_vtable.push((*i, other_entry.clone()));
             }
@@ -791,12 +803,12 @@ impl Member {
         cu::ensure!(
             self.offset == other.offset,
             "members of different offsets cannot be merged"
-        );
-        cu::ensure!(self.name == other.name, "members of different names cannot be merged");
+        )?;
+        cu::ensure!(self.name == other.name, "members of different names cannot be merged")?;
         cu::ensure!(
             self.special == other.special,
             "members of different special types cannot be merged"
-        );
+        )?;
         cu::check!(
             tree_add_merge_deps(&self.ty, &other.ty, task),
             "add_merge_deps failed for member"
@@ -845,11 +857,11 @@ impl VtableEntry {
         cu::ensure!(
             self.name == other.name,
             "vtable entries of different names cannot be merged"
-        );
+        )?;
         cu::ensure!(
             self.function_types.len() == other.function_types.len(),
             "vtable entries of different type lengths cannot be merged"
-        );
+        )?;
         for (a, b) in std::iter::zip(&self.function_types, &other.function_types) {
             cu::check!(
                 tree_add_merge_deps(a, b, task),
@@ -1095,7 +1107,7 @@ impl TemplateArg<Goff> {
     pub fn add_merge_deps(&self, other: &Self, task: &mut MergeTask) -> cu::Result<()> {
         match (self, other) {
             (TemplateArg::Const(a), TemplateArg::Const(b)) => {
-                cu::ensure!(a == b, "value template arg of different value cannot be merged");
+                cu::ensure!(a == b, "value template arg of different value cannot be merged")?;
             }
             (TemplateArg::Type(a), TemplateArg::Type(b)) => {
                 tree_add_merge_deps(a, b, task)?;
@@ -1439,12 +1451,12 @@ impl SymbolInfo {
             "cannot merge symbol info with different linkage names: {} != {}",
             self.link_name,
             other.link_name
-        );
-        cu::ensure!(self.ty == other.ty, "cannot merge symbol info with different types");
+        )?;
+        cu::ensure!(self.ty == other.ty, "cannot merge symbol info with different types")?;
         cu::ensure!(
             self.param_names == other.param_names,
             "cannot merge symbol info with different param_names"
-        );
+        )?;
         // some info does not have template args, in which case we fill it in
         match (self.template_args.is_empty(), other.template_args.is_empty()) {
             (_, true) => {}
@@ -1455,7 +1467,7 @@ impl SymbolInfo {
                 cu::ensure!(
                     self.template_args == other.template_args,
                     "cannot merge symbol info with different template_args"
-                );
+                )?;
             }
         }
         Ok(())
@@ -1469,15 +1481,15 @@ impl SymbolInfo {
             "cannot merge symbol info with different linkage names: {} != {}",
             self.link_name,
             other.link_name
-        );
+        )?;
         cu::ensure!(
             self.address == other.address,
             "cannot merge symbol info with different addresses"
-        );
+        )?;
         cu::ensure!(
             self.param_names == other.param_names,
             "cannot merge symbol info with different param_names"
-        );
+        )?;
         Ok(())
     }
 
@@ -1544,7 +1556,7 @@ fn tree_add_merge_deps(a: &Tree<Goff>, b: &Tree<Goff>, task: &mut MergeTask) -> 
     match (a, b) {
         (Tree::Base(a), Tree::Base(b)) => task.add_dep(*a, *b),
         (Tree::Array(a, len_a), Tree::Array(b, len_b)) => {
-            cu::ensure!(len_a == len_b, "array types of different length cannot be merged");
+            cu::ensure!(len_a == len_b, "array types of different length cannot be merged")?;
             cu::check!(
                 tree_add_merge_deps(a, b, task),
                 "add_merge_deps failed for array element type"
@@ -1560,7 +1572,7 @@ fn tree_add_merge_deps(a: &Tree<Goff>, b: &Tree<Goff>, task: &mut MergeTask) -> 
             cu::ensure!(
                 args_a.len() == args_b.len(),
                 "subroutine types of different length cannot be merged"
-            );
+            )?;
             for (a, b) in std::iter::zip(args_a, args_b) {
                 cu::check!(
                     tree_add_merge_deps(a, b, task),
@@ -1579,7 +1591,7 @@ fn tree_add_merge_deps(a: &Tree<Goff>, b: &Tree<Goff>, task: &mut MergeTask) -> 
             cu::ensure!(
                 a.len() == b.len(),
                 "ptmf subroutine types of different length cannot be merged"
-            );
+            )?;
             task.add_dep(*base_a, *base_b);
             for (a, b) in std::iter::zip(a, b) {
                 cu::check!(

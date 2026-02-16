@@ -36,12 +36,10 @@ impl SymbolList {
             handles.push(handle);
         }
         let total = map.len();
-        let bar = cu::progress_bar(total, "filling ctor/dtor symbols");
-        let mut i = 0;
+        let bar = cu::progress("filling ctor/dtor symbols").total(total).spawn();
         let mut set = cu::co::set(handles);
         while let Some(result) = set.next().await {
-            i += 1;
-            cu::progress!(&bar, i);
+            cu::progress!(bar += 1);
             let (symbols, addr) = cu::check!(result.flatten(), "failed to get all possible symbols")?;
             match symbols {
                 PossibleSymbols::Only(_) => continue,
@@ -94,7 +92,7 @@ pub fn load_symbol_csv(config: &CfgCsv) -> cu::Result<BTreeMap<String, u32>> {
         cu::ensure!(
             rel_address <= u32::MAX as u64,
             "relative address at row {row} is too big, this is likely wrong"
-        );
+        )?;
 
         let symbol = cu::check!(
             parts.get(symbol_column),
@@ -124,7 +122,7 @@ fn get_all_possible_symbols(symbol: &str, demangler: &Demangler) -> cu::Result<P
         cu::ensure!(
             !positions.is_empty(),
             "cannot find D0, D1 or D2 in mangled dtor symbol: {symbol}"
-        );
+        )?;
         let mut buf = symbol.to_string();
         let mut good = None;
         for i in positions {
@@ -265,6 +263,7 @@ fn set_str_byte(s: &mut String, i: usize, b: char) {
 
 enum PossibleSymbols {
     // D0, C3, or not dtor/ctor
+    #[allow(unused)]
     Only(String),
     // D1 and D2 might be the same function
     // and referred to differently in different places,

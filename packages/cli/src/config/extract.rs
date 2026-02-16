@@ -55,14 +55,14 @@ impl CfgExtract {
     pub fn ptmd_size(&self) -> cu::Result<u32> {
         let mut size = cu::check!(self.ptmd_repr.0.byte_size(), "invalid unsized ptmd repr in config")?;
         size *= self.ptmd_repr.1;
-        cu::ensure!(size != 0, "invalid zero-sized ptmd repr in config");
+        cu::ensure!(size != 0, "invalid zero-sized ptmd repr in config")?;
         Ok(size)
     }
 
     pub fn ptmf_size(&self) -> cu::Result<u32> {
         let mut size = cu::check!(self.ptmf_repr.0.byte_size(), "invalid unsized ptmf repr in config")?;
         size *= self.ptmf_repr.1;
-        cu::ensure!(size != 0, "invalid zero-sized ptmf repr in config");
+        cu::ensure!(size != 0, "invalid zero-sized ptmf repr in config")?;
         Ok(size)
     }
 }

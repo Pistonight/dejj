@@ -22,12 +22,12 @@ pub async fn parse_names(stage: &Stage0, command: &CompileCommand) -> cu::Result
         original_cpp_file.is_absolute(),
         "compilation unit name must be absolute: {}",
         stage.name
-    );
+    )?;
     cu::ensure!(
         original_cpp_file.exists(),
         "cannot find source file for compilation unit: {}",
         stage.name
-    );
+    )?;
 
     let mut final_names = GoffMap::default();
     let mut requests = Vec::default();
@@ -306,7 +306,7 @@ impl TypeParseCommand {
         cu::ensure!(
             tu_node.kind == Ast::TranslationUnitDecl,
             "outermost AST node must be TranslationUnitDecl"
-        );
+        )?;
         let mut output = BTreeMap::default();
         let mut stack = vec![];
         for n in tu_node.inner.iter().rev() {
@@ -449,12 +449,12 @@ fn parse_ast(
     nsmaps: &NamespaceMaps,
     config: &Config,
 ) -> cu::Result<NamespacedTemplatedName> {
-    cu::ensure!(node.inner.len() == 1, "TypedefDecl node should have inner length 1");
+    cu::ensure!(node.inner.len() == 1, "TypedefDecl node should have inner length 1")?;
     let node = &node.inner[0];
     let Ast::ElaboratedType { qualifier, .. } = &node.kind else {
         cu::bail!("TypedefDecl node have one ElaboratedType inner node");
     };
-    cu::ensure!(node.inner.len() == 1, "ElaboratedType node should have inner length 1");
+    cu::ensure!(node.inner.len() == 1, "ElaboratedType node should have inner length 1")?;
     let node = &node.inner[0];
     let Ast::TemplateSpecializationType { template_name } = &node.kind else {
         cu::bail!("expecting TemplateSpecializationType");
@@ -485,7 +485,7 @@ fn parse_template_spec_ast(
         if n.kind != Ast::TemplateArgument {
             continue;
         }
-        cu::ensure!(n.inner.len() == 1, "TemplateArgument node should have inner length 1");
+        cu::ensure!(n.inner.len() == 1, "TemplateArgument node should have inner length 1")?;
         template_args.push(parse_template_arg_ast(&n.inner[0], ns, config)?);
     }
 
@@ -546,7 +546,7 @@ fn parse_template_arg_ast_recur(
             ))))
         }
         Ast::ElaboratedType { qualifier: q, ty } => {
-            cu::ensure!(node.inner.len() == 1, "ElaboratedType node should have inner length 1");
+            cu::ensure!(node.inner.len() == 1, "ElaboratedType node should have inner length 1")?;
             let new_qualifier = format!("{qualifier}{q}");
             let qual_type = ty.qual_type.as_str();
             parse_template_arg_ast_recur(&node.inner[0], ns, config, &new_qualifier, Some(qual_type))
@@ -560,11 +560,11 @@ fn parse_template_arg_ast_recur(
             cu::ensure!(
                 !base_name.contains('<'),
                 "template base name should not contain templates"
-            );
+            )?;
             cu::ensure!(
                 !base_name.contains(':'),
                 "template base name should not contain namespaces"
-            );
+            )?;
             let template_args = cu::check!(
                 parse_template_spec_ast(node, ns, config),
                 "failed to parse nested templates at {base_name}"
@@ -579,7 +579,7 @@ fn parse_template_arg_ast_recur(
             ))))
         }
         Ast::RecordType { ty } => {
-            cu::ensure!(node.inner.is_empty(), "RecordType node should have no inner nodes");
+            cu::ensure!(node.inner.is_empty(), "RecordType node should have no inner nodes")?;
             let name = cu::check!(
                 to_namespaced_name_with_fallback(ns, &ty.qual_type, elaborated_qual_type),
                 "failed to convert record qualified name to namespaced name"
@@ -587,7 +587,7 @@ fn parse_template_arg_ast_recur(
             Ok(TemplateArg::Type(Tree::Base(NamespacedTemplatedName::new(name))))
         }
         Ast::EnumType { ty } => {
-            cu::ensure!(node.inner.is_empty(), "EnumType node should have no inner nodes");
+            cu::ensure!(node.inner.is_empty(), "EnumType node should have no inner nodes")?;
             let name = cu::check!(
                 to_namespaced_name_with_fallback(ns, &ty.qual_type, elaborated_qual_type),
                 "failed to convert enum qualified name to namespaced name"
@@ -596,7 +596,7 @@ fn parse_template_arg_ast_recur(
         }
         // *, &, &&
         Ast::PointerType | Ast::LValueReferenceType | Ast::RValueReferenceType => {
-            cu::ensure!(node.inner.len() == 1, "{:?} node should have inner length 1", node.kind);
+            cu::ensure!(node.inner.len() == 1, "{:?} node should have inner length 1", node.kind)?;
             let node = &node.inner[0];
             let pointee = cu::check!(
                 parse_template_arg_ast_recur(node, ns, config, qualifier, None),
@@ -619,12 +619,12 @@ fn parse_template_arg_ast_recur(
             // qualifier (const, volatile, restrict...)
             // while it's technically possible for these to produce different template
             // specializations, for now, we treat them as the same
-            cu::ensure!(node.inner.len() == 1, "QualType node should have inner length 1");
+            cu::ensure!(node.inner.len() == 1, "QualType node should have inner length 1")?;
             let node = &node.inner[0];
             parse_template_arg_ast_recur(node, ns, config, qualifier, None)
         }
         Ast::ParenType => {
-            cu::ensure!(node.inner.len() == 1, "ParenType node should have inner length 1");
+            cu::ensure!(node.inner.len() == 1, "ParenType node should have inner length 1")?;
             let node = &node.inner[0];
             parse_template_arg_ast_recur_paren_type(node, ns, config)
         }
@@ -632,7 +632,7 @@ fn parse_template_arg_ast_recur(
             cu::ensure!(
                 node.inner.len() >= 1,
                 "function proto type must have at least 1 inner node"
-            );
+            )?;
             let mut func_types = Vec::with_capacity(node.inner.len());
             for node in &node.inner {
                 let inner = cu::check!(
@@ -650,7 +650,7 @@ fn parse_template_arg_ast_recur(
             cu::ensure!(
                 node.inner.len() == 2,
                 "member pointer type must have exactly 2 inner nodes"
-            );
+            )?;
             let thisty = cu::check!(
                 parse_template_arg_ast_recur(&node.inner[0], ns, config, "", None),
                 "failed to parse this type for member pointer type"
@@ -747,7 +747,7 @@ fn split_namespace(source: &str) -> cu::Result<(&str, &str)> {
             cu::ensure!(
                 !base.contains('>'),
                 "base name of type cannot contain templates: {source}"
-            );
+            )?;
             Ok((ns, base))
         }
         None => Ok(("", source)),

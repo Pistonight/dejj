@@ -59,7 +59,7 @@ pub fn resolve_alias<'a>(
     is_tree_cache: &mut GoffMap<bool>,
     depth: usize,
 ) -> cu::Result<(Goff, Type0)> {
-    cu::ensure!(depth <= 1000, "depth limit exceeded in resolve_alias");
+    cu::ensure!(depth <= 1000, "depth limit exceeded in resolve_alias")?;
 
     let data = types.get(&goff).unwrap();
     match data {
