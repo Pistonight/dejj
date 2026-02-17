@@ -118,8 +118,9 @@ impl<Repr> Tree<Repr> {
         let mut f: Box<dyn FnMut(&Repr) -> cu::Result<()>> = Box::new(f);
         self.for_each_impl(&mut f)
     }
-    fn for_each_impl<'a>(&self, f: 
-        &mut Box<dyn FnMut(&Repr) -> cu::Result<()> + 'a>
+    fn for_each_impl<'a>(
+        &self,
+        f: &mut Box<dyn FnMut(&Repr) -> cu::Result<()> + 'a>,
     ) -> cu::Result<()> {
         match self {
             Tree::Base(x) => f(x),
@@ -152,9 +153,7 @@ impl<Repr> Tree<Repr> {
         let mut f: Box<dyn FnMut(&Repr)> = Box::new(f);
         self.for_each_ptm_base_impl(&mut f)
     }
-    fn for_each_ptm_base_impl<'a>(&self, f: 
-        &mut Box<dyn FnMut(&Repr)+'a>
-    ) {
+    fn for_each_ptm_base_impl<'a>(&self, f: &mut Box<dyn FnMut(&Repr) + 'a>) {
         match self {
             Tree::Base(_) => {}
             Tree::Array(x, _) => x.for_each_ptm_base_impl(f),
@@ -179,10 +178,7 @@ impl<Repr> Tree<Repr> {
 
     /// Execute a function on each mutable node of the type tree
     #[inline(always)]
-    pub fn for_each_mut<F: FnMut(&mut Repr) -> cu::Result<()>>(
-        &mut self,
-        f: F,
-    ) -> cu::Result<()> {
+    pub fn for_each_mut<F: FnMut(&mut Repr) -> cu::Result<()>>(&mut self, f: F) -> cu::Result<()> {
         let mut f: Box<dyn FnMut(&mut Repr) -> cu::Result<()>> = Box::new(f);
         self.for_each_mut_impl(&mut f)
     }
@@ -213,64 +209,67 @@ impl<Repr> Tree<Repr> {
             }
         }
     }
-    
+
     /// Replace nodes with subtree using a replacer function. Returns None if no replacement
     /// are made.
     ///
     /// The replacer function must return None or Some(Tree::Base) for nodes that appear as base type for PTMD or PTMF.
     /// Otherwise, an error will be returned.
     #[inline(always)]
-    pub fn to_replaced<F: FnMut(&Repr) -> Option<Self>>(
-        &mut self,
-        f: F,
-    ) -> cu::Result<Option<Self>> 
-    where Repr: Clone
+    pub fn to_replaced<F: FnMut(&Repr) -> Option<Self>>(&mut self, f: F) -> cu::Result<Option<Self>>
+    where
+        Repr: Clone,
     {
         let mut f: Box<dyn FnMut(&Repr) -> Option<Self>> = Box::new(f);
         self.to_replaced_impl(&mut f)
     }
-    fn to_replaced_impl<'a>(&self, f: &mut Box<dyn FnMut(&Repr) -> Option<Self> + 'a>)
-        -> cu::Result<Option<Self>>
-    where Repr: Clone
+    fn to_replaced_impl<'a>(
+        &self,
+        f: &mut Box<dyn FnMut(&Repr) -> Option<Self> + 'a>,
+    ) -> cu::Result<Option<Self>>
+    where
+        Repr: Clone,
     {
         match self {
             Tree::Base(x) => Ok(f(x)),
-            Tree::Array(x, len) => {
-                Ok(x.to_replaced_impl(f)?.map(|elem| Self::array(elem, *len)))
-            }
-            Tree::Ptr(x) => {
-                Ok(x.to_replaced_impl(f)?.map(Self::ptr))
-            }
-            Tree::Sub(x) => {
-                Ok(Self::to_replaced_impl_vec(x, f)?.map(Tree::Sub))
-            }
-            Tree::Ptmd(base, x) => {
-                match f(base) {
-                    None => Ok(x.to_replaced_impl(f)?.map(|new_x| Self::ptmd(base.clone(), new_x))),
-                    Some(Tree::Base(base)) => {
+            Tree::Array(x, len) => Ok(x.to_replaced_impl(f)?.map(|elem| Self::array(elem, *len))),
+            Tree::Ptr(x) => Ok(x.to_replaced_impl(f)?.map(Self::ptr)),
+            Tree::Sub(x) => Ok(Self::to_replaced_impl_vec(x, f)?.map(Tree::Sub)),
+            Tree::Ptmd(base, x) => match f(base) {
+                None => Ok(x
+                    .to_replaced_impl(f)?
+                    .map(|new_x| Self::ptmd(base.clone(), new_x))),
+                Some(Tree::Base(base)) => {
                     Ok(x.to_replaced_impl(f)?.map(|new_x| Self::ptmd(base, new_x)))
-                    },
-                    _ => {
-                        cu::bail!("ptmd base type cannot be replaced with tree! check if the type is replacable before calling to_replaced");
-                    }
                 }
-            }
+                _ => {
+                    cu::bail!(
+                        "ptmd base type cannot be replaced with tree! check if the type is replacable before calling to_replaced"
+                    );
+                }
+            },
             Tree::Ptmf(base, x) => {
                 match f(base) {
-                    None => Ok(Self::to_replaced_impl_vec(x, f)?.map(|new_x| Self::ptmf(base.clone(), new_x))),
+                    None => Ok(Self::to_replaced_impl_vec(x, f)?
+                        .map(|new_x| Self::ptmf(base.clone(), new_x))),
                     Some(Tree::Base(base)) => {
                         Ok(Self::to_replaced_impl_vec(x, f)?.map(|new_x| Self::ptmf(base, new_x)))
                     }
                     _ => {
-                        cu::bail!("ptmf base type cannot be replaced with tree! check if the type is replacable before calling to_replaced");
+                        cu::bail!(
+                            "ptmf base type cannot be replaced with tree! check if the type is replacable before calling to_replaced"
+                        );
                     }
                 }
             }
         }
     }
-    fn to_replaced_impl_vec<'a>(v: &[Self], f: &mut Box<dyn FnMut(&Repr) -> Option<Self> + 'a>)
-        -> cu::Result<Option<Vec<Self>>>
-    where Repr: Clone
+    fn to_replaced_impl_vec<'a>(
+        v: &[Self],
+        f: &mut Box<dyn FnMut(&Repr) -> Option<Self> + 'a>,
+    ) -> cu::Result<Option<Vec<Self>>>
+    where
+        Repr: Clone,
     {
         let mut out: Vec<Self> = vec![];
         for (i, t) in v.iter().enumerate() {
@@ -292,7 +291,7 @@ impl<Repr> Tree<Repr> {
             }
         }
         if out.is_empty() {
-            return Ok(None)
+            return Ok(None);
         }
         Ok(Some(out))
     }

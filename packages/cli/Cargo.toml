@@ -10,18 +10,17 @@ cu = { workspace = true, features = [
     "cli", "process", "toml", "json", "derive", "coroutine-heavy"
 ] }
 tyyaml = { path = "../tyyaml" }
-elf = "0.8.0"
+exstractor = { package = "dejj-exstractor", path = "../exstractor" }
+exstructs = { package = "dejj-exstructs", path = "../exstructs" }
+llvmutils = { package = "dejj-llvmutils", path = "../llvmutils" }
+dejj-utils = { path = "../utils" }
 fxhash.workspace = true
-gimli = "0.32.1"
-rayon = "1.11.0"
 regex = "1.11.1"
 serde.workspace = true
 spin = "0.10.0"
 tokio = "1"
-shell-words = "1.1.0"
-clang-ast = "0.1.33"
-dashmap = { version = "6.1.0", features = ["serde"] }
-depfile = "0.1.1"
+shell-words.workspace = true
+dashmap.workspace = true
 
 [[bin]]
 name = "decompdb"

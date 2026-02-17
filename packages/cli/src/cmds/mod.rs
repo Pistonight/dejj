@@ -1,6 +1,5 @@
 use cu::pre::*;
-
-mod cmd_extract;
+use dejj_utils::Config;
 
 #[derive(clap::Parser, AsRef)]
 pub struct CmdMain {
@@ -15,7 +14,7 @@ pub struct CmdMain {
 
 #[derive(clap::Subcommand)]
 pub enum CmdSubcommand {
-    Extract(cmd_extract::CmdExtract),
+    Extract(CmdExtract),
 }
 
 impl AsRef<cu::cli::Flags> for CmdSubcommand {
@@ -27,9 +26,17 @@ impl AsRef<cu::cli::Flags> for CmdSubcommand {
 }
 
 pub fn main(args: CmdMain) -> cu::Result<()> {
-    let config = crate::config::load(args.config)?;
+    let config = Config::load(args.config)?;
 
     match args.cmd {
-        CmdSubcommand::Extract(_) => cmd_extract::run(config),
+        CmdSubcommand::Extract(_) => exstractor::run(config),
     }
+}
+
+/// Extract database artifacts from DWARF info from an ELF file
+#[derive(Debug, clap::Parser, AsRef)]
+pub struct CmdExtract {
+    #[clap(flatten)]
+    #[as_ref]
+    pub common: cu::cli::Flags,
 }

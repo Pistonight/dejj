@@ -1,0 +1,20 @@
+[package]
+name = "dejj-llvmutils"
+version = "0.0.0"
+description = "Interfacing CLANG/LLVM utilities"
+edition = "2024"
+publish = false
+license = "MIT"
+
+[dependencies]
+cu = { workspace = true, features = [ "fs", "json" ] }
+exstructs = { package = "dejj-exstructs", path = "../exstructs" }
+tyyaml = { path = "../tyyaml" }
+
+dashmap.workspace = true
+fxhash.workspace = true
+serde.workspace = true
+shell-words.workspace = true
+
+clang-ast = "0.1.33"
+depfile = "0.1.1"
