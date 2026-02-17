@@ -8,5 +8,8 @@ pub use permute::*;
 pub mod merge;
 
 // == structure implementations ==
+mod contains_goff;
 mod map_goff;
 mod mark;
+mod mark_non_eliminateable;
+mod replace;

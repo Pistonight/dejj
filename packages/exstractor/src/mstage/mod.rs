@@ -3,10 +3,37 @@ use exstructs::{GoffSet, MType, algorithm};
 use crate::stages::MStage;
 
 mod link_merge;
+mod optimize_layout;
 
 pub async fn to_hstage(stages: Vec<MStage>) -> cu::Result<()> {
-    let stage = link_mstages(stages).await?;
+    let mut stage = link_mstages(stages).await?;
+    optimize_layout::run(&mut stage)?;
 
+    cu::hint!("after optimization:");
+    cu::print!("{:#?}", stage.types);
+    let mut enum_count = 0;
+    let mut union_count = 0;
+    let mut struct_count = 0;
+    let mut enum_decl_count = 0;
+    let mut union_decl_count = 0;
+    let mut struct_decl_count = 0;
+    for t in stage.types.values() {
+        match t {
+            MType::Prim(_) => {}
+            MType::Enum(_) => enum_count += 1,
+            MType::Union(_) => union_count += 1,
+            MType::UnionDecl(_) => union_decl_count += 1,
+            MType::Struct(_) => struct_count += 1,
+            MType::EnumDecl(_) => enum_decl_count += 1,
+            MType::StructDecl(_) => struct_decl_count += 1,
+        }
+    }
+    cu::print!("enum_count: {enum_count}");
+    cu::print!("union_count: {union_count}");
+    cu::print!("struct_count: {struct_count}");
+    cu::print!("enum_decl_count: {enum_decl_count}");
+    cu::print!("union_decl_count: {union_decl_count}");
+    cu::print!("struct_decl_count: {struct_decl_count}");
     cu::hint!("done");
     //TODO
     Ok(())

@@ -296,6 +296,19 @@ impl<Repr> Tree<Repr> {
         Ok(Some(out))
     }
 }
+impl<Repr: PartialEq> Tree<Repr> {
+    /// Check if k is in this tree
+    pub fn contains(&self, k: &Repr) -> bool {
+        self.for_each(|x| {
+            if x == k {
+                cu::bail!("break");
+            } else {
+                Ok(())
+            }
+        })
+        .is_err()
+    }
+}
 
 pub trait TreeRepr: Sized + std::fmt::Debug + Clone + PartialEq + Eq + std::hash::Hash {
     /// Serialize the type into a spec string for TyYAML

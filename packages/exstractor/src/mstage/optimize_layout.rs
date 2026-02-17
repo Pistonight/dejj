@@ -1,72 +1,163 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cu::pre::*;
+use exstructs::algorithm;
+use exstructs::{Goff, GoffBuckets, GoffMap, GoffPair, GoffSet, MType, MTypeData, Struct};
 use tyyaml::Tree;
 
-use super::super::bucket::GoffBuckets;
-use super::super::deduper;
-use super::pre::*;
+use crate::stages::MStage;
 
 /// Optimize (simplify) type layouts
-pub fn optimize_layout(stage: &mut Stage1) -> cu::Result<()> {
-    for optimize_fn in OPTIMIZERS {
-        let mut ctx = OptimizeContext::default();
-        for (k, t) in &stage.types {
-
+pub fn run(stage: &mut MStage) -> cu::Result<()> {
+    let mut changed = true;
+    let bar = cu::progress("optimizing type layouts").spawn();
+    let mut pass = 1;
+    while changed {
+        cu::progress!(bar, "pass {pass}");
+        changed = false;
+        for optimize_fn in OPTIMIZERS {
+            let mut ctx = OptimizeContext::default();
+            for (k, t) in &stage.types {
+                t.mark_non_eliminateable(*k, &mut ctx.non_eliminateable);
+            }
+            for si in stage.symbols.values() {
+                si.mark_non_eliminateable(&mut ctx.non_eliminateable);
+            }
+            let output = optimize_fn(stage, &ctx)?;
+            if output.apply(stage)? {
+                changed = true;
+                break; // restart optimization passes if something was optimized
+            }
         }
-        let output = optimize_fn(stage, &ctx)?;
-
+        if changed {
+            let deduped = algorithm::dedupe(
+                std::mem::take(&mut stage.types),
+                GoffBuckets::default(),
+                &mut stage.symbols,
+                None,
+                |data, buckets| data.map_goff(|k| Ok(buckets.primary_fallback(k))),
+            );
+            let deduped = cu::check!(deduped, "optimize_layout: dedupe failed")?;
+            stage.types = deduped;
+        }
+        pass += 1;
     }
     Ok(())
 }
 
-static OPTIMIZERS: &[fn(&Stage1, &OptimizeContext) -> cu::Result<OptimizeOutput>] = &[
-
+static OPTIMIZERS: &[fn(&MStage, &OptimizeContext) -> cu::Result<OptimizeOutput>] = &[
     optimize_little_member_union,
+    optimize_single_member_struct,
     // optimize_single_type_union,
-    // optimize_single_member_struct,
     // optimize_single_base_member_struct,
-
 ];
 
 #[derive(Default)]
 struct OptimizeContext {
     /// Type goffs that cannot be replaced with a tree
-    non_replacable: GoffSet,
+    non_eliminateable: GoffSet,
 }
+
+type ChangeFn = Box<dyn FnOnce(MType) -> MType>;
 
 #[derive(Default)]
 struct OptimizeOutput {
+    /// Change one type to another data. This is applied first
+    changes: GoffMap<Vec<ChangeFn>>,
     /// Eliminate the type by substituting all occurrence with a type tree.
     /// This is applied first.
     eliminations: Eliminations,
-    /// Change one type to another data. This is applied second
-    changes: GoffMap<Type1>,
-    /// Merge 2 types - the merge rules apply. This is applied last
-    merges: Vec<GoffPair>,
+    // /// Merge 2 types - the merge rules apply. This is applied last
+    // merges: Vec<GoffPair>,
 }
 impl OptimizeOutput {
-    fn apply(self, stage: &mut Stage1) -> cu::Result<()> {
-        for (k, tree) in self.eliminations.data {
+    fn change(&mut self, k: Goff, change_fn: impl FnOnce(MType) -> MType + 'static) {
+        self.changes.entry(k).or_default().push(Box::new(change_fn))
+    }
+    /// Apply the optimizations, return true if anything changed
+    fn apply(self, stage: &mut MStage) -> cu::Result<bool> {
+        cu::debug!(
+            "applying optimizations change={}, eliminations={}",
+            self.changes.len(),
+            self.eliminations.data.len()
+        );
+        // change the types
+        let mut changed = false;
+        for (k, changes) in self.changes {
+            let old = cu::check!(
+                stage.types.get_mut(&k),
+                "unlinked type {k} when trying to change"
+            )?;
+            let mut temp = old.clone();
+            for change_fn in changes {
+                temp = change_fn(temp);
+            }
+            if old != &temp {
+                changed = true;
+                *old = temp;
+            }
         }
+        if !self.eliminations.data.is_empty() {
+            let bar = cu::progress("applying eliminations")
+                .total(self.eliminations.data.len())
+                .keep(false)
+                .spawn();
+
+            for (k, replacement) in &self.eliminations.data {
+                if replacement.contains(&k) {
+                    cu::bail!("the replacement recursively contains the type to replace");
+                }
+                for (j, t) in &mut stage.types {
+                    if j == k {
+                        continue;
+                    }
+                    changed |= cu::check!(
+                        t.replace(*k, replacement),
+                        "failed to replace {k} with {replacement:#?} (in type {j})"
+                    )?;
+                }
+                for si in stage.symbols.values_mut() {
+                    changed |= cu::check!(
+                        si.replace(*k, replacement),
+                        "failed to replace type in symbol"
+                    )?;
+                }
+                cu::progress!(bar += 1);
+            }
+        }
+        // remove types that are eliminated
+        for k in self.eliminations.data.keys() {
+            stage.types.remove(k);
+        }
+        Ok(changed)
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct Eliminations {
     data: GoffMap<Tree<Goff>>,
 }
 
 impl Eliminations {
-    fn insert(&mut self, k: Goff, tree: Tree<Goff>) -> cu::Result<()> {
-            use std::collections::btree_map::Entry;
+    fn insert(&mut self, k: Goff, tree: Tree<Goff>, ctx: &OptimizeContext) -> cu::Result<()> {
+        if !matches!(tree, Tree::Base(_)) {
+            // replacing with a composite type
+            if ctx.non_eliminateable.contains(&k) {
+                // not eliminatable, ignore
+                return Ok(());
+            }
+        }
+        use std::collections::btree_map::Entry;
         match self.data.entry(k) {
             Entry::Vacant(e) => {
                 e.insert(tree);
             }
             Entry::Occupied(e) => {
                 if e.get() != &tree {
-                    cu::bail!("conflicting elimination for {k}: new={tree:#?}, old={:#?}", e.get());
+                    cu::bail!(
+                        "conflicting elimination for {k}: new={tree:#?}, old={:#?}",
+                        e.get()
+                    );
                 }
             }
         }
@@ -75,31 +166,50 @@ impl Eliminations {
 }
 
 /// Eliminate unions with fewer than 2 members
-fn optimize_little_member_union(stage: &Stage1, ctx: &OptimizeContext) -> cu::Result<OptimizeOutput> {
+fn optimize_little_member_union(
+    stage: &MStage,
+    ctx: &OptimizeContext,
+) -> cu::Result<OptimizeOutput> {
     let mut output = OptimizeOutput::default();
     for (k, t) in &stage.types {
-        let Type1::Union(name, data, other_names) = t else {
+        let MType::Union(MTypeData {
+            name,
+            data,
+            decl_names,
+        }) = t
+        else {
             continue;
         };
         match data.members.len() {
             0 => {
                 // empty union is the same as an empty struct - a ZST (zero sized type, which has a
                 // sizeof() of 1
-                cu::ensure!(data.byte_size == 1, "expect empty union to be a ZST, but its size is {}", data.byte_size)?;
-                let new_data = Type0Struct { 
-                    template_args: data.template_args.clone(), 
-                    byte_size: 1, 
-                    vtable: vec![], 
-                    members: vec![]
+                cu::ensure!(
+                    data.byte_size == 1,
+                    "expect empty union to be a ZST, but its size is {}",
+                    data.byte_size
+                )?;
+                let new_data = Struct {
+                    template_args: data.template_args.clone(),
+                    byte_size: 1,
+                    vtable: vec![],
+                    members: vec![],
                 };
-                output.changes.insert(*k, Type1::Struct(name.clone(), new_data, other_names.clone()));
+                let new_type = MType::Struct(MTypeData {
+                    name: name.clone(),
+                    data: new_data,
+                    decl_names: decl_names.clone(),
+                });
+                output.change(*k, move |_| new_type);
             }
             1 => {
+                // a union with only one member is equivalent to that member
                 let member = &data.members[0];
-                if !helper::can_eliminate(*k, t, &member.ty, ctx) {
-                    continue;
+                // give inner type name if it's anonymous
+                if let Tree::Base(member_goff) = &member.ty {
+                    helper::assign_name_if_anon(stage, *member_goff, t, &mut output);
                 }
-                output.eliminations.insert(*k, member.ty.clone())?;
+                output.eliminations.insert(*k, member.ty.clone(), ctx)?;
             }
             _ => {}
         }
@@ -107,64 +217,141 @@ fn optimize_little_member_union(stage: &Stage1, ctx: &OptimizeContext) -> cu::Re
     Ok(output)
 }
 
-/// collapse the union if all members are the same type
-fn optimize_single_type_union(stage: &Stage1, ctx: &OptimizeContext) -> cu::Result<OptimizeOutput> {
+/// Eliminate structs with only one member
+fn optimize_single_member_struct(
+    stage: &MStage,
+    ctx: &OptimizeContext,
+) -> cu::Result<OptimizeOutput> {
     let mut output = OptimizeOutput::default();
     for (k, t) in &stage.types {
-        let Type1::Union(_, data, _) = t else {
+        let MType::Struct(MTypeData { data, .. }) = t else {
             continue;
         };
-        let mut the_type = None;
-        for member in &data.members {
-            match &the_type {
-                None => {
-                    the_type = Some(member.ty.clone());
-                }
-                Some(old) => {
-                    if old != &member.ty {
-                        continue;
-                    }
-                }
-            }
-        }
-        let Some(only_type) = the_type else {
-            continue;
-        };
-        if !helper::can_eliminate(*k, t, &only_type, ctx) {
+        if data.members.len() != 1 {
             continue;
         }
-        output.eliminations.insert(*k, only_type)?;
+        if !data.vtable.is_empty() {
+            continue;
+        }
+        let member = &data.members[0];
+        if member.is_base() {
+            continue;
+        }
+        // give inner type name if it's anonymous
+        if let Tree::Base(member_goff) = &member.ty {
+            helper::assign_name_if_anon(stage, *member_goff, t, &mut output);
+        }
+        output.eliminations.insert(*k, member.ty.clone(), ctx)?;
     }
     Ok(output)
 }
 
 mod helper {
     use super::*;
-    pub fn can_eliminate(k: Goff, t: &Type1, replace: &Tree<Goff>, ctx: &OptimizeContext) -> bool {
-        if t.is_layout_directly_recursive(k) {
-            // if the type contains members that references itself, we cannot replace it
-            // but mutual recursive references are fine
-            return false;
-        }
-        if !matches!(replace, Tree::Base(_)) && ctx.non_replacable.contains(&k) {
-            // the type is not replacable with a (non-base) tree
-            return false;
-        }
-        // the replacement tree cannot recursively contain the type it tries to replace
-        // (this shouldn't be legal to compile, but something could happen while
-        // reducing the types
-        let result = replace.for_each(|x| if *x == k {
-            cu::bail!("recursive")
-        } else {
-                Ok(())
-            });
-        if result.is_err() {
-            return false;
-        }
 
-        true
+    pub fn assign_name_if_anon(
+        stage: &MStage,
+        k: Goff,
+        donor: &MType,
+        output: &mut OptimizeOutput,
+    ) {
+        let Some(t) = stage.types.get(&k) else {
+            return;
+        };
+        let (donor_name, donor_decl_names, donor_templates) = match donor {
+            MType::Prim(_) => return,
+            MType::Enum(data) => (&data.name, &data.decl_names, vec![]),
+            MType::EnumDecl(_) => return,
+            MType::Union(data) => (
+                &data.name,
+                &data.decl_names,
+                data.data.template_args.clone(),
+            ),
+            MType::UnionDecl(_) => return,
+            MType::Struct(data) => (
+                &data.name,
+                &data.decl_names,
+                data.data.template_args.clone(),
+            ),
+            MType::StructDecl(_) => return,
+        };
+        let Some(donor_name) = donor_name else {
+            return;
+        };
+        let (name, decl_names) = match t {
+            MType::Prim(_) => return,
+            MType::Enum(data) => (&data.name, &data.decl_names),
+            MType::EnumDecl(_) => return,
+            MType::Union(data) => (&data.name, &data.decl_names),
+            MType::UnionDecl(_) => return,
+            MType::Struct(data) => (&data.name, &data.decl_names),
+            MType::StructDecl(_) => return,
+        };
+        if name.is_none() && decl_names.is_empty() {
+            let name = donor_name.clone();
+            let decl_names = donor_decl_names.clone();
+            output.change(k, move |mut t| {
+                let (data_name, data_decl_names, data_template_args) = match &mut t {
+                    MType::Prim(_) => return t,
+                    MType::Enum(data) => (&mut data.name, &mut data.decl_names, None),
+                    MType::Union(data) => (
+                        &mut data.name,
+                        &mut data.decl_names,
+                        Some(&mut data.data.template_args),
+                    ),
+                    MType::Struct(data) => (
+                        &mut data.name,
+                        &mut data.decl_names,
+                        Some(&mut data.data.template_args),
+                    ),
+                    MType::EnumDecl(_) => return t,
+                    MType::UnionDecl(_) => return t,
+                    MType::StructDecl(_) => return t,
+                };
+                *data_name = Some(name.clone());
+                let mut new_decl_names = BTreeSet::new();
+                new_decl_names.extend(data_decl_names.clone());
+                new_decl_names.extend(decl_names);
+                *data_decl_names = new_decl_names.into_iter().collect();
+                if let Some(template_args) = data_template_args {
+                    *template_args = donor_templates;
+                }
+                t
+            })
+        }
     }
 }
+
+// /// collapse the union if all members are the same type
+// fn optimize_single_type_union(stage: &MStage, ctx: &OptimizeContext) -> cu::Result<OptimizeOutput> {
+//     let mut output = OptimizeOutput::default();
+//     for (k, t) in &stage.types {
+//         let Type1::Union(_, data, _) = t else {
+//             continue;
+//         };
+//         let mut the_type = None;
+//         for member in &data.members {
+//             match &the_type {
+//                 None => {
+//                     the_type = Some(member.ty.clone());
+//                 }
+//                 Some(old) => {
+//                     if old != &member.ty {
+//                         continue;
+//                     }
+//                 }
+//             }
+//         }
+//         let Some(only_type) = the_type else {
+//             continue;
+//         };
+//         if !helper::can_eliminate(*k, t, &only_type, ctx) {
+//             continue;
+//         }
+//         output.eliminations.insert(*k, only_type)?;
+//     }
+//     Ok(output)
+// }
 
 // /// If a union has 2 members of the same size, pick one
 // // #[distributed_slice(OPTIMIZERS)]
@@ -249,38 +436,6 @@ mod helper {
 //     Ok(changed)
 // }
 
-// /// Flatten the struct if it only has one member, and is non-recursive and non-virtual
-// // #[distributed_slice(OPTIMIZERS)]
-// fn optimize_single_member_struct(compiler: &mut TypeCompilerUnit, is_linking: bool) -> cu::Result<bool> {
-//     // if !is_linking {
-//     //     return Ok(false);
-//     // }
-//     let mut changed = false;
-//     for bucket in compiler.compiled.buckets() {
-//         let unit = &bucket.value;
-//         let Some(TypeUnitData::Struct(data)) = &unit.data else {
-//             continue;
-//         };
-//         if !data.vtable.entries.is_empty() {
-//             continue;
-//         }
-//         if data.members.len() != 1 {
-//             continue;
-//         }
-//         let bucket_key = bucket.canonical_key();
-//         let member_type = data.members[0].ty;
-//         let member_type_unit = compiler.compiled.get_unwrap(member_type)?;
-//         if member_type != bucket_key {
-//             if let Some(member_data) = &member_type_unit.value.data {
-//                 if !member_data.is_recursive_to(bucket_key) {
-//                     compiler.merges.push((bucket_key, member_type));
-//                     changed = true;
-//                 }
-//             }
-//         }
-//     }
-//     Ok(changed)
-// }
 //
 // /// Inline the base struct members, if the derived class only has one field
 // /// that is the base class
