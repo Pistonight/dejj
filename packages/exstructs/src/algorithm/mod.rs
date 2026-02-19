@@ -9,6 +9,7 @@ pub mod merge;
 
 // == structure implementations ==
 mod contains_goff;
+mod fullqual;
 mod map_goff;
 mod mark;
 mod mark_non_eliminateable;

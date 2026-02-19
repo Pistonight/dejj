@@ -23,6 +23,9 @@ pub enum HType {
     // Struct(Option<NamespacedName>, Type0Struct, Vec<NamespacedTemplatedName>),
 }
 
+// pub struct HTypeData<T> {
+// }
+
 /// Mid-level (M) Type data
 ///
 /// This is the abstraction used for merging and optimizing types

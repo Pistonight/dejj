@@ -1,9 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cu::pre::*;
-use exstructs::algorithm;
-use exstructs::algorithm::merge::MergeTask;
-use exstructs::{GoffBuckets, GoffPair, GoffSet, MType};
+use exstructs::algorithm::{self, FullQualPermutater, merge::MergeTask};
+use exstructs::{FullQualNameMap, GoffBuckets, GoffMap, GoffPair, GoffSet, MType};
 
 use crate::stages::MStage;
 
@@ -16,7 +15,12 @@ pub fn link_merge(a: MStage, b: MStage) -> cu::Result<MStage> {
 
 /// Merge types that have the same name
 fn process_merges(stage: &mut MStage) -> cu::Result<()> {
-    let mut permutater = exstructs::algorithm::make_structured_name_permutater(&stage.types);
+    let mut fullqual_names = GoffMap::default();
+    for (k, t) in &stage.types {
+        fullqual_names.insert(*k, t.fullqual_names());
+    }
+    let fullqual_names = FullQualNameMap::from(fullqual_names);
+    let mut permutater = FullQualPermutater::new(&fullqual_names);
 
     let mut name2goffs_enum = BTreeMap::<String, GoffSet>::new();
     let mut name2goffs_union = BTreeMap::<String, GoffSet>::new();
@@ -30,7 +34,7 @@ fn process_merges(stage: &mut MStage) -> cu::Result<()> {
         };
         let k = *k;
         let names = cu::check!(
-            permutater.permutated_string_reprs_goff(k),
+            permutater.permutated_fullqual_names(k),
             "failed to permutate names for type {k}"
         )?;
         for name in names {
@@ -62,8 +66,8 @@ fn process_merges(stage: &mut MStage) -> cu::Result<()> {
             let t1 = stage.types.get(&k1).unwrap();
             let t2 = stage.types.get(&k2).unwrap();
             if let Err(e) = t1.add_merge_deps(t2, &mut task) {
-                let k1_names = permutater.structured_names(k1);
-                let k2_names = permutater.structured_names(k2);
+                let k1_names = fullqual_names.get(k1)?;
+                let k2_names = fullqual_names.get(k2)?;
                 cu::rethrow!(
                     e,
                     "failed to add merge deps for {k1} and {k2}\n- merging_name={merging_name}, k1_names={k1_names:#?}, k2_names={k2_names:#?}"
@@ -92,8 +96,8 @@ fn process_merges(stage: &mut MStage) -> cu::Result<()> {
             let mut real_orphan_deps = BTreeSet::default();
             for orphan_dep in all_deps.difference(&keys) {
                 let (k1, k2) = orphan_dep.to_pair();
-                let k1_names = permutater.structured_names(k1);
-                let k2_names = permutater.structured_names(k2);
+                let k1_names = fullqual_names.get(k1)?;
+                let k2_names = fullqual_names.get(k2)?;
                 // one is anonymous, qualified for merging
                 // (sometimes a typedef or using is only there in some CU but not others)
                 if k1_names.is_empty() || k2_names.is_empty() {
@@ -115,17 +119,15 @@ fn process_merges(stage: &mut MStage) -> cu::Result<()> {
                 let mut error_string = "orphan deps found:\n".to_string();
                 for pair in real_orphan_deps {
                     let (k1, k2) = pair.to_pair();
-                    error_string +=
-                        &format!("- a: {k1} names={:#?}\n", permutater.structured_names(k1));
-                    error_string +=
-                        &format!("  b: {k2} names={:#?}\n", permutater.structured_names(k2));
+                    error_string += &format!("- a: {k1} names={:#?}\n", fullqual_names.get(k1)?);
+                    error_string += &format!("  b: {k2} names={:#?}\n", fullqual_names.get(k2)?);
                     error_string += &format!(
                         "  a perm={:#?}\n",
-                        permutater.permutated_string_reprs_goff(k1)?
+                        permutater.permutated_fullqual_names(k1)?
                     );
                     error_string += &format!(
                         "  b perm={:#?}\n",
-                        permutater.permutated_string_reprs_goff(k2)?
+                        permutater.permutated_fullqual_names(k2)?
                     );
                     let mut dep_chain = vec![];
                     let mut current = pair;

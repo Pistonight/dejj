@@ -1,7 +1,38 @@
 use cu::pre::*;
 use tyyaml::{Tree, TreeRepr};
 
-use crate::NamespacedName;
+use crate::{Goff, GoffMap, NamespacedName};
+
+#[derive(Debug, Clone, From, Into)]
+pub struct FullQualNameMap(GoffMap<Vec<FullQualName>>);
+impl FullQualNameMap {
+    pub fn get(&self, goff: Goff) -> cu::Result<&[FullQualName]> {
+        Ok(cu::check!(
+            self.0.get(&goff),
+            "unexpected: did not find goff {goff} in fullqual name map"
+        )?)
+    }
+}
+
+/// Fully-qualified name: namespace, name, templates
+/// Structured name data that generates all string representations of this name
+/// by permutating each segment in the namespaced name
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum FullQualName {
+    Name(NamespacedTemplatedName),
+    Goff(NamespacedTemplatedGoffName),
+}
+
+/// Name with namespace and templates. i.e. the fully qualified name (`foo::bar::Biz<T1, T2>`)
+///
+/// The templates are represented as Goff (type id in the stage)
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct NamespacedTemplatedGoffName {
+    /// The untemplated base name (with namespace)
+    pub base: NamespacedName,
+    /// The template types
+    pub templates: Vec<TemplateArg<Goff>>,
+}
 
 /// Name with namespace and templates. i.e. the fully qualified name (`foo::bar::Biz<T1, T2>`)
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
