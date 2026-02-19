@@ -10,7 +10,7 @@ use crate::stages::HStage;
 /// Optimize (simplify) type layouts
 pub fn run(stage: &mut HStage) -> cu::Result<()> {
     let mut changed = true;
-    let bar = cu::progress("optimizing type layouts").spawn();
+    let bar = cu::progress("stage2 -> stage3: optimizing layouts").spawn();
     let mut pass = 1;
     while changed {
         cu::progress!(bar, "pass {pass}");
@@ -46,6 +46,10 @@ pub fn run(stage: &mut HStage) -> cu::Result<()> {
     Ok(())
 }
 
+//////////////////////// TODO:
+// HStage needs to be mutable, just make the optimizer do one optimization at a time
+// and re-evaluate everything - this will be slow, but otherwise the dependency will be weird
+
 static OPTIMIZERS: &[fn(&HStage, &OptimizeContext) -> cu::Result<OptimizeOutput>] = &[
     optimize_union_fewer_than_2_members,
     // optimize_single_member_struct,
@@ -63,87 +67,96 @@ type ChangeFn = Box<dyn FnOnce(HType) -> cu::Result<HType>>;
 
 #[derive(Default)]
 struct OptimizeOutput {
-    /// Change one type to another data. This is applied first
-    changes: GoffMap<Vec<ChangeFn>>,
-    /// Eliminate the type by substituting all occurrence with a type tree.
-    /// This is applied first.
-    eliminations: Eliminations,
-    // /// Merge 2 types - the merge rules apply. This is applied last
-    // merges: Vec<GoffPair>,
-    /// Add `first` is a derived name of `second`
-    add_is_derived_names: Vec<(FullQualName, FullQualName)>,
+    /// If any changes have been applied
+    changed: bool, // /// Always rerun this optimization even if changed = false
+                   // force_rerun: bool,
+                   // /// Change one type to another data. This is applied first
+                   // changes: GoffMap<Vec<ChangeFn>>,
+                   // /// Eliminate the type by substituting all occurrence with a type tree.
+                   // /// This is applied first.
+                   // eliminations: Eliminations,
+                   // // /// Merge 2 types - the merge rules apply. This is applied last
+                   // // merges: Vec<GoffPair>,
+                   // /// Add `first` is a derived name of `second`
+                   // add_is_derived_names: Vec<(FullQualName, FullQualName)>,
 }
 impl OptimizeOutput {
-    fn change(&mut self, k: Goff, change: HType) {
-        self.change_fn(k, move |_| Ok(change))
-    }
-    fn change_fn(&mut self, k: Goff, change_fn: impl FnOnce(HType) -> cu::Result<HType> + 'static) {
-        self.changes.entry(k).or_default().push(Box::new(change_fn))
-    }
-    /// Apply the optimizations, return true if anything changed
-    fn apply(self, stage: &mut HStage) -> cu::Result<bool> {
-        cu::debug!(
-            "applying optimizations change={}, eliminations={}",
-            self.changes.len(),
-            self.eliminations.data.len()
-        );
-        // change the types
-        let mut changed = false;
-        for (k, changes) in self.changes {
-            let old = cu::check!(
-                stage.types.get_mut(&k),
-                "unlinked type {k} when trying to change"
-            )?;
-            let mut temp = old.clone();
-            for change_fn in changes {
-                temp = cu::check!(
-                    change_fn(temp),
-                    "error running change_fn during optimization"
-                )?;
-            }
-            if old != &temp {
-                changed = true;
-                *old = temp;
-            }
-        }
-        if !self.eliminations.data.is_empty() {
-            let bar = cu::progress("applying eliminations")
-                .total(self.eliminations.data.len())
-                .keep(false)
-                .spawn();
-
-            for (k, replacement) in &self.eliminations.data {
-                if replacement.contains(&k) {
-                    cu::bail!("the replacement recursively contains the type to replace");
-                }
-                for (j, t) in &mut stage.types {
-                    if j == k {
-                        continue;
-                    }
-                    changed |= cu::check!(
-                        t.replace(*k, replacement),
-                        "failed to replace {k} with {replacement:#?} (in type {j})"
-                    )?;
-                }
-                for si in stage.symbols.values_mut() {
-                    changed |= cu::check!(
-                        si.replace(*k, replacement),
-                        "failed to replace type in symbol"
-                    )?;
-                }
-                cu::progress!(bar += 1);
-            }
-        }
-        // remove types that are eliminated
-        for k in self.eliminations.data.keys() {
-            stage.types.remove(k);
-        }
-        // edit name graph
-        for (derived, base) in self.add_is_derived_names {
-            changed |= stage.name_graph.add_derived(&derived, &base)?;
-        }
-        Ok(changed)
-    }
+    // fn change(&mut self, k: Goff, change: HType) {
+    //     self.change_fn(k, move |_| Ok(change))
+    // }
+    // fn change_fn(&mut self, k: Goff, change_fn: impl FnOnce(HType) -> cu::Result<HType> + 'static) {
+    //     self.changes.entry(k).or_default().push(Box::new(change_fn))
+    // }
+    // fn will_change(&self, k: Goff) -> bool {
+    //     let Some(changes) = self.changes.get(&k) else {
+    //         return false;
+    //     };
+    //     !changes.is_empty()
+    // }
+    // /// Apply the optimizations, return true if anything changed
+    // fn apply(self, stage: &mut HStage) -> cu::Result<bool> {
+    //     cu::debug!(
+    //         "applying optimizations change={}, eliminations={}",
+    //         self.changes.len(),
+    //         self.eliminations.data.len()
+    //     );
+    //     // change the types
+    //     let mut changed = false;
+    //     for (k, changes) in self.changes {
+    //         let old = cu::check!(
+    //             stage.types.get_mut(&k),
+    //             "unlinked type {k} when trying to change"
+    //         )?;
+    //         let mut temp = old.clone();
+    //         for change_fn in changes {
+    //             temp = cu::check!(
+    //                 change_fn(temp),
+    //                 "error running change_fn during optimization"
+    //             )?;
+    //         }
+    //         if old != &temp {
+    //             changed = true;
+    //             *old = temp;
+    //         }
+    //     }
+    //     if !self.eliminations.data.is_empty() {
+    //         let bar = cu::progress("applying eliminations")
+    //             .total(self.eliminations.data.len())
+    //             .keep(false)
+    //             .spawn();
+    //
+    //         for (k, replacement) in &self.eliminations.data {
+    //             if replacement.contains(&k) {
+    //                 cu::bail!("the replacement recursively contains the type to replace");
+    //             }
+    //             for (j, t) in &mut stage.types {
+    //                 if j == k {
+    //                     continue;
+    //                 }
+    //                 changed |= cu::check!(
+    //                     t.replace(*k, replacement),
+    //                     "failed to replace {k} with {replacement:#?} (in type {j})"
+    //                 )?;
+    //             }
+    //             for si in stage.symbols.values_mut() {
+    //                 changed |= cu::check!(
+    //                     si.replace(*k, replacement),
+    //                     "failed to replace type in symbol"
+    //                 )?;
+    //             }
+    //             cu::progress!(bar += 1);
+    //         }
+    //     }
+    //     // remove types that are eliminated
+    //     for k in self.eliminations.data.keys() {
+    //         stage.types.remove(k);
+    //     }
+    //     // edit name graph
+    //     for (derived, base) in self.add_is_derived_names {
+    //         changed |= stage.name_graph.add_derived(&derived, &base)?;
+    //     }
+    //     Ok(changed || self.force_rerun)
+    // }
 }
 
 #[derive(Debug, Default)]
@@ -185,6 +198,10 @@ fn optimize_union_fewer_than_2_members(
 ) -> cu::Result<OptimizeOutput> {
     let mut output = OptimizeOutput::default();
     for (k, t) in &stage.types {
+        if output.will_change(*k) {
+            output.force_rerun = true;
+            continue;
+        }
         let HType::Union(HTypeData { fqnames, data }) = t else {
             continue;
         };
@@ -212,21 +229,7 @@ fn optimize_union_fewer_than_2_members(
                 let member = &data.members[0];
                 // give inner type names
                 if let Tree::Base(member_goff) = &member.ty {
-                    let member_t = stage.types.get(member_goff).unwrap();
-                    if let Ok(member_fqnames) = member_t.fqnames() {
-                        for base in member_fqnames {
-                            for derived in fqnames {
-                                output
-                                    .add_is_derived_names
-                                    .push((derived.clone(), base.clone()));
-                            }
-                        }
-                        let fqnames = fqnames.clone();
-                        output.change_fn(*member_goff, move |mut t| {
-                            t.add_fqnames(fqnames);
-                            Ok(t)
-                        });
-                    }
+                    helper::give_names_to_base(stage, *member_goff, fqnames, &mut output);
                 }
                 output.eliminations.insert(*k, member.ty.clone(), ctx)?;
             }
@@ -236,110 +239,66 @@ fn optimize_union_fewer_than_2_members(
     Ok(output)
 }
 
-// /// Eliminate structs with only one member
-// fn optimize_single_member_struct(
-//     stage: &MStage,
-//     ctx: &OptimizeContext,
-// ) -> cu::Result<OptimizeOutput> {
-//     let mut output = OptimizeOutput::default();
-//     for (k, t) in &stage.types {
-//         let MType::Struct(MTypeData { data, .. }) = t else {
-//             continue;
-//         };
-//         if data.members.len() != 1 {
-//             continue;
-//         }
-//         if !data.vtable.is_empty() {
-//             continue;
-//         }
-//         let member = &data.members[0];
-//         if member.is_base() {
-//             continue;
-//         }
-//         // give inner type name if it's anonymous
-//         if let Tree::Base(member_goff) = &member.ty {
-//             helper::assign_name_if_anon(stage, *member_goff, t, &mut output);
-//         }
-//         output.eliminations.insert(*k, member.ty.clone(), ctx)?;
-//     }
-//     Ok(output)
-// }
+/// Eliminate structs with only one member
+fn optimize_single_member_struct(
+    stage: &HStage,
+    ctx: &OptimizeContext,
+) -> cu::Result<OptimizeOutput> {
+    let mut output = OptimizeOutput::default();
+    for (k, t) in &stage.types {
+        let HType::Struct(HTypeData { data, fqnames }) = t else {
+            continue;
+        };
+        if data.members.len() != 1 {
+            continue;
+        }
+        if !data.vtable.is_empty() {
+            continue;
+        }
+        let member = &data.members[0];
+        // for single member, it should equal to size of the member
+        let self_size = data.byte_size;
 
-// mod helper {
-//     use super::*;
-//
-//     pub fn assign_name_if_anon(
-//         stage: &MStage,
-//         k: Goff,
-//         donor: &MType,
-//         output: &mut OptimizeOutput,
-//     ) {
-//         let Some(t) = stage.types.get(&k) else {
-//             return;
-//         };
-//         let (donor_name, donor_decl_names, donor_templates) = match donor {
-//             MType::Prim(_) => return,
-//             MType::Enum(data) => (&data.name, &data.decl_names, vec![]),
-//             MType::EnumDecl(_) => return,
-//             MType::Union(data) => (
-//                 &data.name,
-//                 &data.decl_names,
-//                 data.data.template_args.clone(),
-//             ),
-//             MType::UnionDecl(_) => return,
-//             MType::Struct(data) => (
-//                 &data.name,
-//                 &data.decl_names,
-//                 data.data.template_args.clone(),
-//             ),
-//             MType::StructDecl(_) => return,
-//         };
-//         let Some(donor_name) = donor_name else {
-//             return;
-//         };
-//         let (name, decl_names) = match t {
-//             MType::Prim(_) => return,
-//             MType::Enum(data) => (&data.name, &data.decl_names),
-//             MType::EnumDecl(_) => return,
-//             MType::Union(data) => (&data.name, &data.decl_names),
-//             MType::UnionDecl(_) => return,
-//             MType::Struct(data) => (&data.name, &data.decl_names),
-//             MType::StructDecl(_) => return,
-//         };
-//         if name.is_none() && decl_names.is_empty() {
-//             let name = donor_name.clone();
-//             let decl_names = donor_decl_names.clone();
-//             output.change(k, move |mut t| {
-//                 let (data_name, data_decl_names, data_template_args) = match &mut t {
-//                     MType::Prim(_) => return t,
-//                     MType::Enum(data) => (&mut data.name, &mut data.decl_names, None),
-//                     MType::Union(data) => (
-//                         &mut data.name,
-//                         &mut data.decl_names,
-//                         Some(&mut data.data.template_args),
-//                     ),
-//                     MType::Struct(data) => (
-//                         &mut data.name,
-//                         &mut data.decl_names,
-//                         Some(&mut data.data.template_args),
-//                     ),
-//                     MType::EnumDecl(_) => return t,
-//                     MType::UnionDecl(_) => return t,
-//                     MType::StructDecl(_) => return t,
-//                 };
-//                 *data_name = Some(name.clone());
-//                 let mut new_decl_names = BTreeSet::new();
-//                 new_decl_names.extend(data_decl_names.clone());
-//                 new_decl_names.extend(decl_names);
-//                 *data_decl_names = new_decl_names.into_iter().collect();
-//                 if let Some(template_args) = data_template_args {
-//                     *template_args = donor_templates;
-//                 }
-//                 t
-//             })
-//         }
-//     }
-// }
+        let member_size = stage.sizes.get_tree(&member.ty)?;
+        cu::ensure!(
+            self_size == member_size,
+            "{k}: self_size={self_size}, member_size={member_size}"
+        )?;
+        // give inner type name if it's anonymous
+        if let Tree::Base(member_goff) = &member.ty {
+            helper::give_names_to_base(stage, *member_goff, fqnames, &mut output);
+        }
+        output.eliminations.insert(*k, member.ty.clone(), ctx)?;
+    }
+    Ok(output)
+}
+
+mod helper {
+    use super::*;
+
+    pub fn give_names_to_base(
+        stage: &HStage,
+        base_goff: Goff,
+        fqnames: &[FullQualName],
+        output: &mut OptimizeOutput,
+    ) {
+        let member_t = stage.types.get(&base_goff).unwrap();
+        if let Ok(member_fqnames) = member_t.fqnames() {
+            for base in member_fqnames {
+                for derived in fqnames {
+                    output
+                        .add_is_derived_names
+                        .push((derived.clone(), base.clone()));
+                }
+            }
+            let fqnames = fqnames.to_vec();
+            output.change_fn(base_goff, move |mut t| {
+                t.add_fqnames(fqnames);
+                Ok(t)
+            });
+        }
+    }
+}
 
 // /// collapse the union if all members are the same type
 // fn optimize_single_type_union(stage: &MStage, ctx: &OptimizeContext) -> cu::Result<OptimizeOutput> {

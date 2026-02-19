@@ -1,4 +1,4 @@
-use exstructs::{GoffMap, HType, HTypeData, MType, Struct};
+use exstructs::{GoffMap, HType, HTypeData, MType, SizeMap, Struct};
 
 use crate::stages::{HStage, MStage};
 use cu::pre::*;
@@ -6,7 +6,7 @@ use cu::pre::*;
 mod optimize_layout;
 
 pub fn from_mstage(stage: MStage) -> cu::Result<HStage> {
-    let mut stage = convert_from_mstage(stage);
+    let mut stage = convert_from_mstage(stage)?;
     cu::check!(
         optimize_layout::run(&mut stage),
         "failed to optimize type layouts"
@@ -14,7 +14,7 @@ pub fn from_mstage(stage: MStage) -> cu::Result<HStage> {
     Ok(stage)
 }
 
-fn convert_from_mstage(stage: MStage) -> HStage {
+fn convert_from_mstage(stage: MStage) -> cu::Result<HStage> {
     let mut types = GoffMap::default();
     let mut sizes = GoffMap::default();
     for (k, t) in stage.types {
@@ -49,12 +49,18 @@ fn convert_from_mstage(stage: MStage) -> HStage {
         types.insert(k, t);
         sizes.insert(k, s);
     }
+    let sizes = SizeMap::new(
+        sizes,
+        stage.config.extract.pointer_size()?,
+        stage.config.extract.ptmd_size()?,
+        stage.config.extract.ptmf_size()?,
+    );
 
-    HStage {
+    Ok(HStage {
         types,
-        sizes: sizes.into(),
+        sizes,
         config: stage.config,
         symbols: stage.symbols,
         name_graph: Default::default(),
-    }
+    })
 }

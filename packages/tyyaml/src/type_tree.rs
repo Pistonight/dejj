@@ -77,6 +77,38 @@ impl<Repr> Tree<Repr> {
         }
     }
 
+    /// Calculate the byte size of the type tree
+    #[inline(always)]
+    pub fn byte_size<F: FnMut(&Repr) -> Option<u32>>(
+        &self,
+        pointer_size: u32,
+        ptmd_size: u32,
+        ptmf_size: u32,
+        f: F,
+    ) -> Option<u32> {
+        let mut f: Box<dyn FnMut(&Repr) -> Option<u32>> = Box::new(f);
+        self.byte_size_impl(pointer_size, ptmd_size, ptmf_size, &mut f)
+    }
+    fn byte_size_impl<'a>(
+        &self,
+        pointer_size: u32,
+        ptmd_size: u32,
+        ptmf_size: u32,
+        f: &mut Box<dyn FnMut(&Repr) -> Option<u32> + 'a>,
+    ) -> Option<u32> {
+        match self {
+            Tree::Base(x) => f(x),
+            Tree::Array(x, len) => {
+                let elem_size = x.byte_size_impl(pointer_size, ptmd_size, ptmf_size, f)?;
+                Some(elem_size * len)
+            }
+            Tree::Ptr(_) => Some(pointer_size),
+            Tree::Sub(_) => None,
+            Tree::Ptmd(_, _) => Some(ptmd_size),
+            Tree::Ptmf(_, _) => Some(ptmf_size),
+        }
+    }
+
     /// Replace the base representation of the tree using a mapping function
     #[inline(always)]
     pub fn map<T, F: FnMut(Repr) -> T>(self, f: F) -> Tree<T> {

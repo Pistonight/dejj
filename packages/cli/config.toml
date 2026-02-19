@@ -28,6 +28,7 @@ ptmf-repr = ["u64", 2]
 char-repr = "u8"
 wchar-repr = "u32"
 vfptr-field-regex = "^_vptr\\$"
+debug.lstage = false
 debug.mstage = true
 debug.hstage = true
 

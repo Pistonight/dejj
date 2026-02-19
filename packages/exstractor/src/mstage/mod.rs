@@ -10,6 +10,7 @@ pub async fn link_mstages(mut stages: Vec<MStage>) -> cu::Result<MStage> {
         let total = stages.len() - 1;
         let bar = cu::progress("stage1 -> stage2: merging types")
             .total(total)
+            .eta(false)
             .spawn();
         let pool = cu::co::pool(-1);
         let mut handles = Vec::with_capacity(total / 2 + 1);

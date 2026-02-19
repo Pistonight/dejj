@@ -773,12 +773,17 @@ fn load_array_subrange_count(entry: &Die<'_, '_>) -> cu::Result<Option<u32>> {
                 )?;
                 count = match count_64 {
                     None => None,
-                    Some(count) => {
+                    Some(next_count) => {
                         cu::ensure!(
-                            count < u32::MAX as u64,
-                            "array length is too big: {count}. This is unlikely to be correct."
+                            next_count < u32::MAX as u64,
+                            "array dimension is too big: {next_count}. This is unlikely to be correct."
                         )?;
-                        Some(count as u32)
+                        let product = count.unwrap_or(1) as u64 * next_count;
+                        cu::ensure!(
+                            product < u32::MAX as u64,
+                            "array cumulative dimension is too big: {product}. This is unlikely to be correct."
+                        )?;
+                        Some(product as u32)
                     }
                 };
             }

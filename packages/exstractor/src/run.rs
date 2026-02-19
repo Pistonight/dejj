@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -112,6 +113,14 @@ pub fn run(config: Config) -> cu::Result<()> {
         stages
     };
 
+    if config.extract.debug.lstage {
+        let types = stages
+            .iter()
+            .flat_map(|x| &x.types)
+            .collect::<BTreeMap<_, _>>();
+        save_debug(types, &config.paths.extract_output, "lstage");
+    }
+
     let stages = {
         let compile_commands = compile_commands.clone();
         let stages = cu::co::run(async move {
@@ -144,9 +153,9 @@ pub fn run(config: Config) -> cu::Result<()> {
             cu::Ok(output)
         })?;
 
-        let mut info = StageInfo::new(1);
-        stages.iter().for_each(|x| info.add_mstage(x));
-        info.print();
+        // let mut info = StageInfo::new(1);
+        // stages.iter().for_each(|x| info.add_mstage(x));
+        // info.print();
 
         stages
     };
@@ -154,42 +163,33 @@ pub fn run(config: Config) -> cu::Result<()> {
     let stage = cu::co::run(async move { mstage::link_mstages(stages).await })?;
     StageInfo::mstage2(&stage).print();
     if config.extract.debug.mstage {
-        let debug_info = format!(
-            "/* The .rs extension is only for syntax highlighting and the macro is to suppress syntax errors */ mstage!{{{:#?}}}",
-            stage.types
-        );
-        let out_path = config.paths.extract_output.join("mstage.rs");
-        match cu::fs::write(&out_path, debug_info) {
-            Ok(()) => cu::hint!(
-                "mstage debug info saved to {}",
-                out_path.try_to_rel().display()
-            ),
-            Err(e) => {
-                cu::warn!("failed to save mstage debug info: {e:?}");
-            }
-        }
+        save_debug(&stage.types, &config.paths.extract_output, "mstage");
     }
 
     let stage = hstage::from_mstage(stage)?;
     StageInfo::hstage3(&stage).print();
     if config.extract.debug.hstage {
-        let debug_info = format!(
-            "/* The .rs extension is only for syntax highlighting and the macro is to suppress syntax errors */ mstage!{{{:#?}}}",
-            stage.types
-        );
-        let out_path = config.paths.extract_output.join("hstage.rs");
-        match cu::fs::write(&out_path, debug_info) {
-            Ok(()) => cu::hint!(
-                "hstage debug info saved to {}",
-                out_path.try_to_rel().display()
-            ),
-            Err(e) => {
-                cu::warn!("failed to save hstage debug info: {e:?}");
-            }
-        }
+        save_debug(&stage.types, &config.paths.extract_output, "hstage");
     }
 
     cu::hint!("todo");
 
     Ok(())
+}
+
+fn save_debug(t: impl std::fmt::Debug, out_dir: &Path, name: &str) {
+    let debug_info = format!(
+        "/* The .rs extension is only for syntax highlighting and the macro is to suppress syntax errors */ {name}!{{{t:#?}}}",
+    );
+    let out_path = out_dir.join(format!("{name}.rs"));
+    match cu::fs::write(&out_path, debug_info) {
+        Ok(()) => cu::hint!(
+            "{} debug info saved to {}",
+            name,
+            out_path.try_to_rel().display()
+        ),
+        Err(e) => {
+            cu::warn!("failed to save {name} debug info: {e:?}");
+        }
+    }
 }

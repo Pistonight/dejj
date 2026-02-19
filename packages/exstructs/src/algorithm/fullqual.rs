@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use crate::{
     Enum, FullQualName, HType, MType, MTypeData, MTypeDecl, NamespacedName,
     NamespacedTemplatedGoffName, NamespacedTemplatedName, Struct, Union,
@@ -21,12 +23,16 @@ impl HType {
         }
     }
     pub fn add_fqnames(&mut self, names: Vec<FullQualName>) {
-        match self {
-            HType::Prim(_) => {}
-            HType::Enum(data) => data.fqnames.extend(names),
-            HType::Union(data) => data.fqnames.extend(names),
-            HType::Struct(data) => data.fqnames.extend(names),
-        }
+        let fqnames = match self {
+            HType::Prim(_) => return,
+            HType::Enum(data) => &mut data.fqnames,
+            HType::Union(data) => &mut data.fqnames,
+            HType::Struct(data) => &mut data.fqnames,
+        };
+        let mut set = BTreeSet::new();
+        set.extend(fqnames.drain(..));
+        set.extend(names);
+        fqnames.extend(set);
     }
 }
 

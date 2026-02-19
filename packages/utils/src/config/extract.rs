@@ -79,6 +79,9 @@ impl ExtractConfig {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ExtractDebugConfig {
+    /// Print lstage debug info to <outdir>/lstage.rs
+    #[serde(default)]
+    pub lstage: bool,
     /// Print mstage debug info to <outdir>/mstage.rs
     #[serde(default)]
     pub mstage: bool,
