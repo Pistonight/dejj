@@ -23,10 +23,29 @@ pub enum HType {
     Struct(HTypeData<Struct>),
 }
 
+impl HType {
+    pub fn as_enum_mut(&mut self) -> cu::Result<&mut HTypeData<Enum>> {
+        match self {
+            HType::Enum(data) => Ok(data),
+            _ => cu::bail!("expected HTYPE to be enum"),
+        }
+    }
+    pub fn as_union_mut(&mut self) -> cu::Result<&mut HTypeData<Union>> {
+        match self {
+            HType::Union(data) => Ok(data),
+            _ => cu::bail!("expected HTYPE to be union"),
+        }
+    }
+    pub fn as_struct_mut(&mut self) -> cu::Result<&mut HTypeData<Struct>> {
+        match self {
+            HType::Struct(data) => Ok(data),
+            _ => cu::bail!("expected HTYPE to be struct"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct HTypeData<T> {
-    /// The size of the type
-    pub size: usize,
     /// All fually qualified names of this type. Empty means this type is currently
     /// anonymous
     pub fqnames: Vec<FullQualName>,
@@ -159,10 +178,10 @@ pub struct EnumUndeterminedSize {
 /// Data of a `union`
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Union {
-    /// Template arguments, if any
-    pub template_args: Vec<TemplateArg<Goff>>,
     /// Byte size of the union (should be size of the largest member)
     pub byte_size: u32,
+    /// Template arguments, if any
+    pub template_args: Vec<TemplateArg<Goff>>,
     /// Union members. The members must have offset of 0 and special of None
     pub members: Vec<Member>,
 }
@@ -170,15 +189,30 @@ pub struct Union {
 /// Data of a `struct` or `class`
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Struct {
-    /// Template specialization of the struct, if any
-    pub template_args: Vec<TemplateArg<Goff>>,
     /// Byte size of the struct
     pub byte_size: u32,
+    /// Template specialization of the struct, if any
+    pub template_args: Vec<TemplateArg<Goff>>,
+    /// Members of the struct
+    pub members: Vec<Member>,
     /// Vtable of the struct. (index, entry).
     /// Dtors will have an index of 0
     pub vtable: Vec<(usize, VtableEntry)>,
-    /// Members of the struct
-    pub members: Vec<Member>,
+}
+
+impl Struct {
+    /// Create a zero-sized type (which has sizeof(T) == 1)
+    pub fn zst() -> Self {
+        Self::zst_with_templates(vec![])
+    }
+    pub fn zst_with_templates(template_args: Vec<TemplateArg<Goff>>) -> Self {
+        Self {
+            byte_size: 1,
+            template_args,
+            members: vec![],
+            vtable: vec![],
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

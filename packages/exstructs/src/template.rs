@@ -17,7 +17,7 @@ impl FullQualNameMap {
 /// Fully-qualified name: namespace, name, templates
 /// Structured name data that generates all string representations of this name
 /// by permutating each segment in the namespaced name
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum FullQualName {
     Name(NamespacedTemplatedName),
     Goff(NamespacedTemplatedGoffName),

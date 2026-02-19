@@ -15,3 +15,7 @@ mod structure;
 pub use structure::*;
 mod symbol;
 pub use symbol::*;
+mod size;
+pub use size::*;
+mod name_graph;
+pub use name_graph::*;

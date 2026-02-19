@@ -4,7 +4,7 @@ use std::sync::Arc;
 use cu::pre::*;
 
 use dejj_utils::Config;
-use exstructs::{GoffMap, HType, LType, MType, NamespaceMaps, SymbolInfo};
+use exstructs::{GoffMap, HType, LType, MType, NameGraph, NamespaceMaps, SizeMap, SymbolInfo};
 
 #[derive(Default)]
 pub struct StageInfo {
@@ -115,6 +115,7 @@ impl StageInfo {
             + 0.1)
             .log10() as usize
             + 1;
+
         let digits2 = ([
             self.enum_decl_count,
             self.union_decl_count,
@@ -178,6 +179,10 @@ pub struct HStage {
     pub types: GoffMap<HType>,
     pub config: Arc<Config>,
     pub symbols: BTreeMap<String, SymbolInfo>,
+    /// Size of each type, cached for convenience
+    pub sizes: SizeMap,
+    /// Relationship of the names
+    pub name_graph: NameGraph,
 }
 
 /// Mid-level (M) type stage

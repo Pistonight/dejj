@@ -3,6 +3,7 @@ mod run;
 pub use run::run;
 
 mod dwarf_loader;
+mod hstage;
 mod lstage;
 mod mstage;
 

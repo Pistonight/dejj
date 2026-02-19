@@ -4,7 +4,24 @@
 //! - A struct/class with vtable cannot be eliminated
 //! - A type that directly references itself cannot be eliminated
 
-use crate::{Goff, GoffSet, MType, Member, Struct, SymbolInfo, TemplateArg, Union, VtableEntry};
+use crate::{
+    Goff, GoffSet, HType, MType, Member, Struct, SymbolInfo, TemplateArg, Union, VtableEntry,
+};
+
+impl HType {
+    pub fn mark_non_eliminateable(&self, self_goff: Goff, marked: &mut GoffSet) {
+        match self {
+            Self::Prim(_) => {}
+            Self::Enum(_) => {}
+            Self::Union(data) => {
+                data.data.mark_non_eliminateable(self_goff, marked);
+            }
+            Self::Struct(data) => {
+                data.data.mark_non_eliminateable(self_goff, marked);
+            }
+        }
+    }
+}
 
 impl MType {
     pub fn mark_non_eliminateable(&self, self_goff: Goff, marked: &mut GoffSet) {

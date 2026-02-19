@@ -3,7 +3,19 @@
 use cu::pre::*;
 use tyyaml::Tree;
 
-use crate::{Goff, MType, Member, Struct, SymbolInfo, TemplateArg, Union, VtableEntry};
+use crate::{Goff, HType, MType, Member, Struct, SymbolInfo, TemplateArg, Union, VtableEntry};
+
+impl HType {
+    pub fn replace(&mut self, k: Goff, replacement: &Tree<Goff>) -> cu::Result<bool> {
+        match self {
+            Self::Prim(_) => {}
+            Self::Enum(_) => {}
+            Self::Union(data) => return data.data.replace(k, replacement),
+            Self::Struct(data) => return data.data.replace(k, replacement),
+        }
+        Ok(false)
+    }
+}
 
 impl MType {
     pub fn replace(&mut self, k: Goff, replacement: &Tree<Goff>) -> cu::Result<bool> {

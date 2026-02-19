@@ -1,7 +1,34 @@
 use crate::{
-    Enum, FullQualName, MType, MTypeData, MTypeDecl, NamespacedName, NamespacedTemplatedGoffName,
-    NamespacedTemplatedName, Struct, Union,
+    Enum, FullQualName, HType, MType, MTypeData, MTypeDecl, NamespacedName,
+    NamespacedTemplatedGoffName, NamespacedTemplatedName, Struct, Union,
 };
+
+impl HType {
+    pub fn fqnames(&self) -> cu::Result<&[FullQualName]> {
+        match self {
+            HType::Prim(_) => cu::bail!("expected HTYPE to have fqnames, but it's a primitive"),
+            HType::Enum(data) => Ok(&data.fqnames),
+            HType::Union(data) => Ok(&data.fqnames),
+            HType::Struct(data) => Ok(&data.fqnames),
+        }
+    }
+    pub fn into_fqnames(self) -> cu::Result<Vec<FullQualName>> {
+        match self {
+            HType::Prim(_) => cu::bail!("expected HTYPE to have fqnames, but it's a primitive"),
+            HType::Enum(data) => Ok(data.fqnames),
+            HType::Union(data) => Ok(data.fqnames),
+            HType::Struct(data) => Ok(data.fqnames),
+        }
+    }
+    pub fn add_fqnames(&mut self, names: Vec<FullQualName>) {
+        match self {
+            HType::Prim(_) => {}
+            HType::Enum(data) => data.fqnames.extend(names),
+            HType::Union(data) => data.fqnames.extend(names),
+            HType::Struct(data) => data.fqnames.extend(names),
+        }
+    }
+}
 
 impl MType {
     /// Get all fully qualified names

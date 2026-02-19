@@ -1,26 +1,8 @@
-use exstructs::{GoffMap, GoffSet, HType, HTypeData, MType, algorithm};
+use exstructs::{GoffSet, MType, algorithm};
 
-use crate::stages::{HStage, MStage};
+use crate::stages::MStage;
 
 mod link_merge;
-
-// pub fn to_hstage(stage: MStage) -> cu::Result<HStage> {
-//     let mut types = GoffMap::default();
-//     for (k, t) in stage.types {
-//         let t = match t {
-//             MType::Prim(prim) => HType::Prim(prim),
-//             MType::Enum(mtype_data) => todo!(),
-//             MType::Union(mtype_data) => todo!(),
-//             MType::Struct(mtype_data) => todo!(),
-//             MType::EnumDecl(decl) |
-//             MType::UnionDecl(decl) |
-//             MType::StructDecl(decl) => {
-//                 HType::Struct(HTypeData { size: (), fqnames: (), data: () })
-//             },
-//         };
-//         types.insert(k, t);
-//     }
-// }
 
 pub async fn link_mstages(mut stages: Vec<MStage>) -> cu::Result<MStage> {
     cu::ensure!(!stages.is_empty(), "no CUs to merge")?;

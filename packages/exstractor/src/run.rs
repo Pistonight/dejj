@@ -8,6 +8,7 @@ use symlist::SymbolList;
 
 use crate::dwarf::Dwarf;
 use crate::dwarf_loader;
+use crate::hstage;
 use crate::lstage;
 use crate::mstage;
 use crate::stages::StageInfo;
@@ -159,12 +160,31 @@ pub fn run(config: Config) -> cu::Result<()> {
         );
         let out_path = config.paths.extract_output.join("mstage.rs");
         match cu::fs::write(&out_path, debug_info) {
-            Ok(()) => cu::info!(
+            Ok(()) => cu::hint!(
                 "mstage debug info saved to {}",
                 out_path.try_to_rel().display()
             ),
             Err(e) => {
                 cu::warn!("failed to save mstage debug info: {e:?}");
+            }
+        }
+    }
+
+    let stage = hstage::from_mstage(stage)?;
+    StageInfo::hstage3(&stage).print();
+    if config.extract.debug.hstage {
+        let debug_info = format!(
+            "/* The .rs extension is only for syntax highlighting and the macro is to suppress syntax errors */ mstage!{{{:#?}}}",
+            stage.types
+        );
+        let out_path = config.paths.extract_output.join("hstage.rs");
+        match cu::fs::write(&out_path, debug_info) {
+            Ok(()) => cu::hint!(
+                "hstage debug info saved to {}",
+                out_path.try_to_rel().display()
+            ),
+            Err(e) => {
+                cu::warn!("failed to save hstage debug info: {e:?}");
             }
         }
     }
