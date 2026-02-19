@@ -10,6 +10,7 @@ use crate::dwarf::Dwarf;
 use crate::dwarf_loader;
 use crate::lstage;
 use crate::mstage;
+use crate::stages::StageInfo;
 
 pub fn run(config: Config) -> cu::Result<()> {
     cu::fs::make_dir(&config.paths.extract_output)?;
@@ -74,9 +75,8 @@ pub fn run(config: Config) -> cu::Result<()> {
     let stages = {
         let config = Arc::clone(&config);
         let symbol_list = Arc::clone(&symbol_list);
-        cu::co::run(async move {
+        let stages = cu::co::run(async move {
             let bar = cu::progress("stage0: loading types")
-                .keep(false)
                 .total(units.len())
                 .spawn();
             let mut handles = Vec::with_capacity(units.len());
@@ -95,24 +95,26 @@ pub fn run(config: Config) -> cu::Result<()> {
             }
 
             let mut set = cu::co::set(handles);
-            let mut type_count = 0;
             while let Some(result) = set.next().await {
                 let stage = result??;
-                type_count += stage.types.len();
                 cu::progress!(bar += 1, "{}", stage.name);
                 output.push(stage);
             }
-            cu::info!("stage0: loaded {type_count} types");
             output.sort_unstable_by_key(|x| x.offset);
             cu::Ok(output)
-        })?
+        })?;
+
+        let mut info = StageInfo::new(0);
+        stages.iter().for_each(|x| info.add_lstage(x));
+        info.print();
+
+        stages
     };
 
     let stages = {
         let compile_commands = compile_commands.clone();
-        cu::co::run(async move {
+        let stages = cu::co::run(async move {
             let bar = cu::progress("stage0 -> stage1: reducing types")
-                .keep(false)
                 .total(stages.len())
                 .spawn();
             let mut handles = Vec::with_capacity(stages.len());
@@ -131,21 +133,43 @@ pub fn run(config: Config) -> cu::Result<()> {
             }
 
             let mut set = cu::co::set(handles);
-            let mut type_count = 0;
             while let Some(result) = set.next().await {
                 let stage = result??;
-                type_count += stage.types.len();
                 cu::progress!(bar += 1, "{}", stage.name);
                 output.push(stage);
             }
-            cu::info!("stage1: reduced into {type_count} types");
             drop(bar);
             output.sort_unstable_by_key(|x| x.offset);
             cu::Ok(output)
-        })?
+        })?;
+
+        let mut info = StageInfo::new(1);
+        stages.iter().for_each(|x| info.add_mstage(x));
+        info.print();
+
+        stages
     };
 
-    let stage = cu::co::run(async move { mstage::to_hstage(stages).await })?;
+    let stage = cu::co::run(async move { mstage::link_mstages(stages).await })?;
+    StageInfo::mstage2(&stage).print();
+    if config.extract.debug.mstage {
+        let debug_info = format!(
+            "/* The .rs extension is only for syntax highlighting and the macro is to suppress syntax errors */ mstage!{{{:#?}}}",
+            stage.types
+        );
+        let out_path = config.paths.extract_output.join("mstage.rs");
+        match cu::fs::write(&out_path, debug_info) {
+            Ok(()) => cu::info!(
+                "mstage debug info saved to {}",
+                out_path.try_to_rel().display()
+            ),
+            Err(e) => {
+                cu::warn!("failed to save mstage debug info: {e:?}");
+            }
+        }
+    }
+
+    cu::hint!("todo");
 
     Ok(())
 }

@@ -3,13 +3,33 @@
 use cu::pre::*;
 
 use crate::{
-    Enum, EnumUndeterminedSize, Goff, GoffMapFn, LType, LTypeData, LTypeDecl, MType, MTypeData,
-    MTypeDecl, Member, NameSeg, Namespace, NamespacedName, NamespacedTemplatedName, Struct,
-    SymbolInfo, TemplateArg, Union, VtableEntry,
+    Enum, EnumUndeterminedSize, FullQualName, Goff, GoffMapFn, HType, HTypeData, LType, LTypeData,
+    LTypeDecl, MType, MTypeData, MTypeDecl, Member, NameSeg, Namespace, NamespacedName,
+    NamespacedTemplatedGoffName, NamespacedTemplatedName, Struct, SymbolInfo, TemplateArg, Union,
+    VtableEntry,
 };
 
 pub trait MapGoff {
     fn map_goff(&mut self, f: &GoffMapFn) -> cu::Result<()>;
+}
+
+impl HType {
+    pub fn map_goff<F: Fn(Goff) -> cu::Result<Goff>>(&mut self, f: F) -> cu::Result<()> {
+        let f: GoffMapFn = Box::new(f);
+        match self {
+            Self::Prim(_) => {}
+            Self::Enum(data) => {
+                cu::check!(data.map_goff(&f), "failed to map HTYPE enum")?;
+            }
+            Self::Union(data) => {
+                cu::check!(data.map_goff(&f), "failed to map HTYPE union")?;
+            }
+            Self::Struct(data) => {
+                cu::check!(data.map_goff(&f), "failed to map HTYPE struct")?;
+            }
+        }
+        Ok(())
+    }
 }
 
 impl MType {
@@ -80,6 +100,16 @@ impl LType {
                 )?;
             }
         }
+        Ok(())
+    }
+}
+
+impl<T: MapGoff> HTypeData<T> {
+    pub fn map_goff(&mut self, f: &GoffMapFn) -> cu::Result<()> {
+        for n in &mut self.fqnames {
+            cu::check!(n.map_goff(&f), "failed to map name for HTYPE data")?;
+        }
+        cu::check!(self.data.map_goff(&f), "failed to map data for HTYPE")?;
         Ok(())
     }
 }
@@ -199,7 +229,6 @@ impl VtableEntry {
 }
 
 impl SymbolInfo {
-    /// Run goff conversion on nested type data
     pub fn map_goff(&mut self, f: &GoffMapFn) -> cu::Result<()> {
         cu::check!(
             self.ty.for_each_mut(|r| {
@@ -213,6 +242,25 @@ impl SymbolInfo {
             cu::check!(targ.map_goff(&f), "failed to map symbol template args")?;
         }
 
+        Ok(())
+    }
+}
+
+impl FullQualName {
+    pub fn map_goff(&mut self, f: &GoffMapFn) -> cu::Result<()> {
+        match self {
+            FullQualName::Name(n) => n.map_goff(f),
+            FullQualName::Goff(n) => n.map_goff(f),
+        }
+    }
+}
+
+impl NamespacedTemplatedGoffName {
+    pub fn map_goff(&mut self, f: &GoffMapFn) -> cu::Result<()> {
+        self.base.map_goff(f)?;
+        for targ in &mut self.templates {
+            targ.map_goff(&f)?;
+        }
         Ok(())
     }
 }

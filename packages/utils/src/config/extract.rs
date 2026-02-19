@@ -22,6 +22,8 @@ pub struct ExtractConfig {
     pub wchar_repr: Prim,
     /// Regex for the virtual function pointer field
     pub vfptr_field_regex: SerdeRegex,
+    /// Debug config
+    pub debug: ExtractDebugConfig,
     /// Rules for the type parser
     pub type_parser: ExtractTypeParserConfig,
     /// Rules for resolving type names
@@ -72,6 +74,17 @@ impl ExtractConfig {
         cu::ensure!(size != 0, "invalid zero-sized ptmf repr in config")?;
         Ok(size)
     }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct ExtractDebugConfig {
+    /// Print mstage debug info to <outdir>/mstage.rs
+    #[serde(default)]
+    pub mstage: bool,
+    /// Print hstage debug info to <outdir>/hstage.rs
+    #[serde(default)]
+    pub hstage: bool,
 }
 
 #[derive(Debug, Deserialize)]

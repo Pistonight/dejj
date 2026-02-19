@@ -62,6 +62,13 @@ impl SymbolInfo {
         }
     }
 
+    pub fn is_data(&self) -> bool {
+        !self.is_func()
+    }
+    pub fn is_func(&self) -> bool {
+        matches!(self.ty, Tree::Sub(_))
+    }
+
     /// Link symbol info across different CUs
     ///
     /// This does not compare type offsets, since they are different in different CUs

@@ -1,50 +1,32 @@
-use exstructs::{GoffSet, MType, algorithm};
+use exstructs::{GoffMap, GoffSet, HType, HTypeData, MType, algorithm};
 
-use crate::stages::MStage;
+use crate::stages::{HStage, MStage};
 
 mod link_merge;
-mod optimize_layout;
 
-pub async fn to_hstage(stages: Vec<MStage>) -> cu::Result<()> {
-    let mut stage = link_mstages(stages).await?;
-    optimize_layout::run(&mut stage)?;
+// pub fn to_hstage(stage: MStage) -> cu::Result<HStage> {
+//     let mut types = GoffMap::default();
+//     for (k, t) in stage.types {
+//         let t = match t {
+//             MType::Prim(prim) => HType::Prim(prim),
+//             MType::Enum(mtype_data) => todo!(),
+//             MType::Union(mtype_data) => todo!(),
+//             MType::Struct(mtype_data) => todo!(),
+//             MType::EnumDecl(decl) |
+//             MType::UnionDecl(decl) |
+//             MType::StructDecl(decl) => {
+//                 HType::Struct(HTypeData { size: (), fqnames: (), data: () })
+//             },
+//         };
+//         types.insert(k, t);
+//     }
+// }
 
-    cu::hint!("after optimization:");
-    cu::print!("{:#?}", stage.types);
-    let mut enum_count = 0;
-    let mut union_count = 0;
-    let mut struct_count = 0;
-    let mut enum_decl_count = 0;
-    let mut union_decl_count = 0;
-    let mut struct_decl_count = 0;
-    for t in stage.types.values() {
-        match t {
-            MType::Prim(_) => {}
-            MType::Enum(_) => enum_count += 1,
-            MType::Union(_) => union_count += 1,
-            MType::UnionDecl(_) => union_decl_count += 1,
-            MType::Struct(_) => struct_count += 1,
-            MType::EnumDecl(_) => enum_decl_count += 1,
-            MType::StructDecl(_) => struct_decl_count += 1,
-        }
-    }
-    cu::print!("enum_count: {enum_count}");
-    cu::print!("union_count: {union_count}");
-    cu::print!("struct_count: {struct_count}");
-    cu::print!("enum_decl_count: {enum_decl_count}");
-    cu::print!("union_decl_count: {union_decl_count}");
-    cu::print!("struct_decl_count: {struct_decl_count}");
-    cu::hint!("done");
-    //TODO
-    Ok(())
-}
-
-async fn link_mstages(mut stages: Vec<MStage>) -> cu::Result<MStage> {
+pub async fn link_mstages(mut stages: Vec<MStage>) -> cu::Result<MStage> {
     cu::ensure!(!stages.is_empty(), "no CUs to merge")?;
     let stage = {
         let total = stages.len() - 1;
         let bar = cu::progress("stage1 -> stage2: merging types")
-            .keep(false)
             .total(total)
             .spawn();
         let pool = cu::co::pool(-1);
@@ -70,35 +52,8 @@ async fn link_mstages(mut stages: Vec<MStage>) -> cu::Result<MStage> {
             symbol.mark(&mut marked);
         }
         algorithm::mark_and_sweep(marked, &mut stage.types, MType::mark);
-        cu::info!("stage2: merged into {} types", stage.types.len());
         stage
     };
-
-    // cu::print!("{:#?}", stage.types);
-    //
-    let mut enum_count = 0;
-    let mut union_count = 0;
-    let mut struct_count = 0;
-    let mut enum_decl_count = 0;
-    let mut union_decl_count = 0;
-    let mut struct_decl_count = 0;
-    for t in stage.types.values() {
-        match t {
-            MType::Prim(_) => {}
-            MType::Enum(_) => enum_count += 1,
-            MType::Union(_) => union_count += 1,
-            MType::UnionDecl(_) => union_decl_count += 1,
-            MType::Struct(_) => struct_count += 1,
-            MType::EnumDecl(_) => enum_decl_count += 1,
-            MType::StructDecl(_) => struct_decl_count += 1,
-        }
-    }
-    cu::print!("enum_count: {enum_count}");
-    cu::print!("union_count: {union_count}");
-    cu::print!("struct_count: {struct_count}");
-    cu::print!("enum_decl_count: {enum_decl_count}");
-    cu::print!("union_decl_count: {union_decl_count}");
-    cu::print!("struct_decl_count: {struct_decl_count}");
 
     Ok(stage)
 }

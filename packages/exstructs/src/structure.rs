@@ -2,29 +2,37 @@ use std::sync::Arc;
 
 use tyyaml::{Prim, Tree};
 
-use crate::{Goff, Namespace, NamespacedName, NamespacedTemplatedName, TemplateArg};
+use crate::{FullQualName, Goff, Namespace, NamespacedName, NamespacedTemplatedName, TemplateArg};
 
 /// High-level (H) Type data
 ///
 /// - Declarations are merged with the definitions
 ///   - Undefined declarations become empty struct with the name
+///     i.e. as `struct Foo;`
 /// - Typedef names are merged with the definitions
 /// - All compile units are linked together
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum HType {
-    // TODO
-    // /// Pritimive type
-    // Prim(Prim),
-    // /// Enum + typedef names. The name does not include template args. could be anonymous
-    // Enum(Option<NamespacedName>, Type1Enum, Vec<NamespacedTemplatedName>),
-    // /// Union + typedef names. The name does not include template args. could be anonymous
-    // Union(Option<NamespacedName>, Type0Union, Vec<NamespacedTemplatedName>),
-    // /// Struct + typedef names. The name does not include template args. could be anonymous
-    // Struct(Option<NamespacedName>, Type0Struct, Vec<NamespacedTemplatedName>),
+    /// Pritimive type
+    Prim(Prim),
+    /// Enum
+    Enum(HTypeData<Enum>),
+    /// Union
+    Union(HTypeData<Union>),
+    /// Struct/Class
+    Struct(HTypeData<Struct>),
 }
 
-// pub struct HTypeData<T> {
-// }
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct HTypeData<T> {
+    /// The size of the type
+    pub size: usize,
+    /// All fually qualified names of this type. Empty means this type is currently
+    /// anonymous
+    pub fqnames: Vec<FullQualName>,
+    /// The data of the type
+    pub data: T,
+}
 
 /// Mid-level (M) Type data
 ///
