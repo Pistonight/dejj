@@ -3,14 +3,14 @@ use exstructs::{GoffMap, HType, HTypeData, MType, SizeMap, Struct};
 use crate::stages::{HStage, MStage};
 use cu::pre::*;
 
-mod optimize_layout;
+//mod optimize_layout;
 
 pub fn from_mstage(stage: MStage) -> cu::Result<HStage> {
     let mut stage = convert_from_mstage(stage)?;
-    cu::check!(
-        optimize_layout::run(&mut stage),
-        "failed to optimize type layouts"
-    )?;
+    // cu::check!(
+    //     optimize_layout::run(&mut stage),
+    //     "failed to optimize type layouts"
+    // )?;
     Ok(stage)
 }
 

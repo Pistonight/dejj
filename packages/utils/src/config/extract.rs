@@ -10,6 +10,11 @@ use crate::SerdeRegex;
 pub struct ExtractConfig {
     /// Command and args for building the project before extracting
     pub build_command: Vec<String>,
+    /// Let the build command inherit stdout, stderr and stdin.
+    /// This is useful for build commands that does not work nicely
+    /// with piped output
+    #[serde(default)]
+    pub build_command_inherit_io: bool,
     /// Pointer width for the target platform, must be 8, 16, 32 or 64
     pub pointer_width: u8,
     /// Representation of PTMD, as an array of primitive

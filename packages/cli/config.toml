@@ -22,6 +22,7 @@ symbol-column = 1
 
 [extract]
 build-command = ["ninja"]
+build-command-inherit-io = false
 pointer-width = 64
 ptmd-repr = ["u64", 1]
 ptmf-repr = ["u64", 2]

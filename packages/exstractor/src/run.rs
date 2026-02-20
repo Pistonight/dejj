@@ -18,19 +18,7 @@ pub fn run(config: Config) -> cu::Result<()> {
     cu::fs::make_dir(&config.paths.extract_output)?;
     // build the project to generate the ELF
     // usually this should be fast since the build is incremental
-    {
-        // unwrap: config is validated
-        let build_bin = config.extract.build_command.first().unwrap();
-        let (child, _, bar) = Path::new(build_bin)
-            .command()
-            .args(config.extract.build_command.iter().skip(1))
-            .current_dir(&config.paths.build_dir)
-            .stdoe(cu::pio::spinner("build project"))
-            .stdin_null()
-            .spawn()?;
-        child.wait_nz()?;
-        bar.done();
-    }
+    cu::check!(build_project(&config), "failed to execute build command, please ensure the decomp project is in a clean state.")?;
 
     let config = Arc::new(config);
 
@@ -174,6 +162,29 @@ pub fn run(config: Config) -> cu::Result<()> {
 
     cu::hint!("todo");
 
+    Ok(())
+}
+
+fn build_project(config: &Config) -> cu::Result<()> {
+    // unwrap: config is validated
+    let build_bin = config.extract.build_command.first().unwrap();
+    let command = Path::new(build_bin)
+            .command()
+            .args(config.extract.build_command.iter().skip(1))
+            .current_dir(&config.paths.build_dir);
+    if config.extract.build_command_inherit_io {
+        cu::info!("building project");
+        command
+            .all_inherit()
+            .wait_nz()?;
+    } else {
+        let (child, bar, _) = command
+        .stdoe(cu::pio::spinner("building project"))
+        .stdin_null()
+        .spawn()?;
+        child.wait_nz()?;
+        bar.done();
+    }
     Ok(())
 }
 
