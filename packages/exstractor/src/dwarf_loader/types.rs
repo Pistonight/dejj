@@ -4,8 +4,7 @@ use std::sync::Arc;
 use cu::pre::*;
 use dejj_utils::Config;
 use exstructs::{
-    EnumUndeterminedSize, Enumerator, Goff, GoffMap, LType, LTypeData, LTypeDecl, Member,
-    NamespaceMaps, SpecialMember, Struct, SymbolInfo, TemplateArg, Union, VtableEntry,
+    ArcStr, EnumUndeterminedSize, Enumerator, Goff, GoffMap, LType, LTypeData, LTypeDecl, Member, NamespaceMaps, SpecialMember, Struct, SymbolInfo, TemplateArg, Union, VtableEntry
 };
 use gimli::constants::*;
 use symlist::SymbolList;
@@ -33,23 +32,21 @@ pub fn load_lstage(
         types,
         nsmaps,
     };
-    cu::debug!("loading types for {unit}");
     cu::check!(
         load_types_root(unit, &mut ctx),
         "failed to load types for {unit}"
     )?;
-    cu::debug!("loaded {} types from {unit}", ctx.types.len());
+    cu::trace!("loaded {} types from {unit}", ctx.types.len());
 
     let mut ctx2 = LoadSymbolCtx {
         loaded: Default::default(),
         symbol_list,
     };
-    cu::debug!("loading symbols for {unit}");
     cu::check!(
         load_symbols_root(unit, &mut ctx2),
         "failed to load symbols for {unit}"
     )?;
-    cu::debug!("loaded {} symbols from {unit}", ctx2.loaded.len());
+    cu::trace!("loaded {} symbols from {unit}", ctx2.loaded.len());
 
     Ok(LStage {
         offset: unit.offset.into(),
@@ -334,7 +331,7 @@ fn load_enum_type_from_entry(entry: &Die<'_, '_>, ctx: &mut LoadTypeCtx) -> cu::
                     "failed to get enumerator value at {offset}"
                 )?;
                 enumerators.push(Enumerator {
-                    name: Arc::from(name),
+                    name: ArcStr::from(name),
                     value,
                 });
             }
@@ -407,7 +404,7 @@ fn load_union_type_from_entry(entry: &Die<'_, '_>, ctx: &mut LoadTypeCtx) -> cu:
         let offset = entry.goff();
         match entry.tag() {
             DW_TAG_member => {
-                let name = entry.name_opt()?.map(Arc::from);
+                let name = entry.name_opt()?.map(ArcStr::from);
                 let type_loff = cu::check!(
                     entry.loff_opt(DW_AT_type),
                     "failed to get type for union member at {offset}"
@@ -563,7 +560,7 @@ fn load_struct_type_from_entry(entry: &Die<'_, '_>, ctx: &mut LoadTypeCtx) -> cu
                 } else {
                     Member {
                         offset: member_offset,
-                        name: name.map(Arc::from),
+                        name: name.map(ArcStr::from),
                         ty: Tree::Base(type_offset),
                         special: None,
                     }
@@ -629,7 +626,7 @@ fn load_struct_type_from_entry(entry: &Die<'_, '_>, ctx: &mut LoadTypeCtx) -> cu
                     return Ok(());
                 };
                 let name = cu::check!(entry.name(), "failed to get virtual function name at {offset}")?;
-                let name = Arc::from(name);
+                let name = ArcStr::from(name);
                 let function_types = cu::check!(
                     load_subroutine_types_from_entry(&entry, false),
                     "failed to read virtual function data at {offset}"

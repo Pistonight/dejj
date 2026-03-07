@@ -11,5 +11,6 @@ cu = { workspace = true, features = [
 ] }
 tyyaml = { path = "../tyyaml" }
 
+fxhash.workspace = true
 regex.workspace = true
 serde.workspace = true

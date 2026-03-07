@@ -141,10 +141,8 @@ pub fn run(config: Config) -> cu::Result<()> {
             cu::Ok(output)
         })?;
 
-        // let mut info = StageInfo::new(1);
-        // stages.iter().for_each(|x| info.add_mstage(x));
-        // info.print();
-
+        let cache_hit_count = stages.iter().filter(|x| x.is_cache_hit).count();
+        cu::info!("stage1: l2mcache hit {} of {} compilation units", cache_hit_count, stages.len());
         stages
     };
 

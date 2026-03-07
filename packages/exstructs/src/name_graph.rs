@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::FullQualName;
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct NameGraph {
     names: Vec<FullQualName>,
     indices: BTreeMap<FullQualName, usize>,
@@ -34,9 +34,23 @@ impl NameGraph {
             }
         }
     }
+
+    pub fn extend(&mut self, other: &Self) -> cu::Result<()> {
+        for (a, b) in other.iter_derived() {
+            self.add_derived(a, b)?;
+        }
+        Ok(())
+    }
+
+    pub fn iter_derived(&self) -> impl Iterator<Item=(&FullQualName, &FullQualName)> {
+        self.is_derived.iter().map(|(a, b)| {
+            (self.names.get(a).unwrap(), self.names.get(b).unwrap())
+        })
+    }
+    
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Edges(BTreeMap<usize, BTreeSet<usize>>);
 impl Edges {
     /// Check if an edge is in the graph
@@ -50,5 +64,9 @@ impl Edges {
     /// Add an edge to the graph
     pub fn insert(&mut self, edge: (usize, usize)) -> bool {
         self.0.entry(edge.0).or_default().insert(edge.1)
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item=(usize, usize)> {
+        self.0.iter().flat_map(|(k, v)| v.iter().map(|v| (*k, *v)))
     }
 }

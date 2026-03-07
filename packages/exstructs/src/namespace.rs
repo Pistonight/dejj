@@ -3,9 +3,10 @@ use std::collections::BTreeMap;
 use cu::pre::*;
 use tyyaml::Prim;
 
-use crate::{ArcStr, Goff, GoffMap, GoffSet};
+use crate::{ArcStr, Goff, GoffMap};
 
 /// Data for all namespaces
+#[derive(PartialEq, Serialize, Deserialize)]
 pub struct NamespaceMaps {
     /// Goff to the qualifier that goff is in
     pub qualifiers: GoffMap<Namespace>,
@@ -138,12 +139,6 @@ impl NameSeg {
             (NameSeg::Subprogram(a, _, _), NameSeg::Subprogram(b, _, _)) => a == b,
             (NameSeg::Anonymous, NameSeg::Anonymous) => true,
             _ => false,
-        }
-    }
-    /// Mark referenced types for GC
-    pub fn mark(&self, marked: &mut GoffSet) {
-        if let NameSeg::Type(goff, _) = self {
-            marked.insert(*goff);
         }
     }
 }

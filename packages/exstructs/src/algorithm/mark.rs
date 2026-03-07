@@ -1,18 +1,32 @@
 //! Mark referenced types for sweeping
 
 use crate::{
-    Enum, EnumUndeterminedSize, Goff, GoffSet, LType, LTypeData, LTypeDecl, MType, MTypeData,
-    MTypeDecl, Namespace, NamespacedName, NamespacedTemplatedName, Struct, SymbolInfo, TemplateArg,
-    Union,
+    Enum, EnumUndeterminedSize, FullQualName, Goff, GoffSet, HType, HTypeData, LType, LTypeData, LTypeDecl, MType, MTypeData, MTypeDecl, NameSeg, Namespace, NamespacedName, NamespacedTemplatedGoffName, NamespacedTemplatedName, Struct, SymbolInfo, TemplateArg, Union
 };
 
 pub trait Mark {
-    /// Mark referenced types for sweeping
+    /// Mark referenced types (for GC, connected components calculation, ...)
     fn mark(&self, marked: &mut GoffSet);
 }
 
+impl HType {
+    /// Mark referenced types
+    pub fn mark(&self, self_goff: Goff, marked: &mut GoffSet) {
+        match self {
+            Self::Prim(prim) => {
+                marked.insert(Goff::prim(*prim));
+                return; // don't mark self
+            }
+            Self::Enum(data) => data.mark(marked),
+            Self::Union(data) => data.mark(marked),
+            Self::Struct(data) => data.mark(marked),
+        }
+        marked.insert(self_goff);
+    }
+}
+
 impl MType {
-    /// Mark referenced types for GC
+    /// Mark referenced types
     ///
     /// self_goff is the goff of the MType being processed.
     /// global Prim and Decl MTypes are not considered strong refs
@@ -71,6 +85,15 @@ impl LType {
     }
 }
 
+impl<T: Mark> HTypeData<T> {
+    pub fn mark(&self, marked: &mut GoffSet) {
+        for n in &self.fqnames {
+            n.mark(marked);
+        }
+        self.data.mark(marked);
+    }
+}
+
 impl<T: Mark> MTypeData<T> {
     pub fn mark(&self, marked: &mut GoffSet) {
         if let Some(name) = &self.name {
@@ -113,8 +136,10 @@ impl Mark for Enum {
 }
 
 impl Mark for EnumUndeterminedSize {
-    fn mark(&self, _: &mut GoffSet) {
-        assert!(self.byte_size_or_base.is_ok())
+    fn mark(&self, marked: &mut GoffSet) {
+        if let Err(e) = self.byte_size_or_base {
+            marked.insert(e);
+        }
     }
 }
 
@@ -172,7 +197,25 @@ impl SymbolInfo {
     }
 }
 
+impl FullQualName {
+    pub fn mark(&self, marked: &mut GoffSet) {
+        match self {
+            FullQualName::Name(n) => n.mark(marked),
+            FullQualName::Goff(n) => n.mark(marked),
+        }
+    }
+}
+
 impl NamespacedTemplatedName {
+    pub fn mark(&self, marked: &mut GoffSet) {
+        self.base.mark(marked);
+        for t in &self.templates {
+            t.mark(marked);
+        }
+    }
+}
+
+impl NamespacedTemplatedGoffName {
     pub fn mark(&self, marked: &mut GoffSet) {
         self.base.mark(marked);
         for t in &self.templates {
@@ -215,6 +258,30 @@ impl Namespace {
     pub fn mark(&self, marked: &mut GoffSet) {
         for seg in &self.0 {
             seg.mark(marked);
+        }
+    }
+    pub fn mark_all(&self, marked: &mut GoffSet) {
+        for seg in &self.0 {
+            seg.mark(marked);
+        }
+    }
+}
+
+impl NameSeg {
+    /// Mark referenced types for GC
+    pub fn mark(&self, marked: &mut GoffSet) {
+        if let NameSeg::Type(goff, _) = self {
+            marked.insert(*goff);
+        }
+        // note we don't mark subprogram here
+    }
+    pub fn mark_all(&self, marked: &mut GoffSet) {
+        match self {
+            NameSeg::Type(goff, _) => {
+                marked.insert(*goff);}
+            NameSeg::Subprogram(goff, _, _) => {marked.insert(*goff);}
+            NameSeg::Name(_) => {}
+            NameSeg::Anonymous => {}
         }
     }
 }

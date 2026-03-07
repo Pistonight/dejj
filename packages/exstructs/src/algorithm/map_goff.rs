@@ -16,6 +16,11 @@ pub trait MapGoff {
 impl HType {
     pub fn map_goff<F: Fn(Goff) -> cu::Result<Goff>>(&mut self, f: F) -> cu::Result<()> {
         let f: GoffMapFn = Box::new(f);
+        MapGoff::map_goff(self, &f)
+    }
+}
+impl MapGoff for HType {
+    fn map_goff(&mut self, f: &GoffMapFn) -> cu::Result<()> {
         match self {
             Self::Prim(_) => {}
             Self::Enum(data) => {
@@ -35,6 +40,12 @@ impl HType {
 impl MType {
     pub fn map_goff<F: Fn(Goff) -> cu::Result<Goff>>(&mut self, f: F) -> cu::Result<()> {
         let f: GoffMapFn = Box::new(f);
+        MapGoff::map_goff(self, &f)
+    }
+}
+
+impl MapGoff for MType {
+    fn map_goff(&mut self, f: &GoffMapFn) -> cu::Result<()> {
         match self {
             Self::Prim(_) => {}
             Self::Enum(data) => {
@@ -60,9 +71,16 @@ impl MType {
     }
 }
 
+
 impl LType {
     pub fn map_goff<F: Fn(Goff) -> cu::Result<Goff>>(&mut self, f: F) -> cu::Result<()> {
         let f: GoffMapFn = Box::new(f);
+        MapGoff::map_goff(self, &f)
+    }
+}
+
+impl MapGoff for LType {
+    fn map_goff(&mut self, f: &GoffMapFn) -> cu::Result<()> {
         match self {
             Self::Prim(_) => {}
             Self::Typedef { name, target } => {
@@ -168,7 +186,10 @@ impl MapGoff for Enum {
 }
 
 impl MapGoff for EnumUndeterminedSize {
-    fn map_goff(&mut self, _: &GoffMapFn) -> cu::Result<()> {
+    fn map_goff(&mut self, f: &GoffMapFn) -> cu::Result<()> {
+        if let Err(e) = &mut self.byte_size_or_base {
+            *e = f(*e)?;
+        }
         Ok(())
     }
 }
@@ -228,8 +249,8 @@ impl VtableEntry {
     }
 }
 
-impl SymbolInfo {
-    pub fn map_goff(&mut self, f: &GoffMapFn) -> cu::Result<()> {
+impl MapGoff for SymbolInfo {
+    fn map_goff(&mut self, f: &GoffMapFn) -> cu::Result<()> {
         cu::check!(
             self.ty.for_each_mut(|r| {
                 *r = f(*r)?;
@@ -311,8 +332,8 @@ impl NamespacedName {
     }
 }
 
-impl Namespace {
-    pub fn map_goff(&mut self, f: &GoffMapFn) -> cu::Result<()> {
+impl MapGoff for Namespace {
+    fn map_goff(&mut self, f: &GoffMapFn) -> cu::Result<()> {
         for seg in &mut self.0 {
             seg.map_goff(f)?;
         }

@@ -4,6 +4,7 @@ use std::hash::{Hash, Hasher};
 use cu::pre::*;
 use fxhash::FxHasher;
 
+use crate::algorithm::MapGoff;
 use crate::{GoffBuckets, GoffMap, GoffMapFn, NamespaceMaps, SymbolInfo};
 
 pub fn dedupe<T: Eq + Hash + std::fmt::Debug, FMap: Fn(&mut T, &GoffBuckets) -> cu::Result<()>>(

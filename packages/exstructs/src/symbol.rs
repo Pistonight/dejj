@@ -1,9 +1,11 @@
 use tyyaml::Tree;
 
+use cu::pre::*;
+
 use crate::{Goff, TemplateArg};
 
 /// Information of a global symbol
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct SymbolInfo {
     /// Address of the symbol (offset in the original binary)
     pub address: u32,

@@ -1,48 +1,54 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cu::pre::*;
-use exstructs::{FullQualName, HType, HTypeData, algorithm};
-use exstructs::{Goff, GoffBuckets, GoffMap, GoffPair, GoffSet, MType, MTypeData, Struct};
+use exstructs::{
+    FullQualName, HType, HTypeData, algorithm,
+    Goff, GoffBuckets, GoffMap, GoffPair, GoffSet, MType, MTypeData, Struct
+};
 use tyyaml::Tree;
 
 use crate::stages::HStage;
 
 /// Optimize (simplify) type layouts
 pub fn run(stage: &mut HStage) -> cu::Result<()> {
-    let mut changed = true;
-    let bar = cu::progress("stage2 -> stage3: optimizing layouts").spawn();
-    let mut pass = 1;
-    while changed {
-        cu::progress!(bar, "pass {pass}");
-        changed = false;
-        for optimize_fn in OPTIMIZERS {
-            let mut ctx = OptimizeContext::default();
-            for (k, t) in &stage.types {
-                t.mark_non_eliminateable(*k, &mut ctx.non_eliminateable);
-            }
-            for si in stage.symbols.values() {
-                si.mark_non_eliminateable(&mut ctx.non_eliminateable);
-            }
-            let output = optimize_fn(stage, &ctx)?;
-            if output.apply(stage)? {
-                changed = true;
-                break; // restart optimization passes if something was optimized
-            }
-        }
-        if changed {
-            let deduped = algorithm::dedupe(
-                std::mem::take(&mut stage.types),
-                GoffBuckets::default(),
-                &mut stage.symbols,
-                None,
-                |data, buckets| data.map_goff(|k| Ok(buckets.primary_fallback(k))),
-            );
-            let deduped = cu::check!(deduped, "optimize_layout: dedupe failed")?;
-            stage.types = deduped;
-        }
-        pass += 1;
-    }
-    bar.done();
+    let connected_components = algorithm::calc_connected_components(&stage.types)?;
+    cu::info!("there are {} connected components to optimize in the type graph", connected_components.len());
+
+
+    // let mut changed = true;
+    // let bar = cu::progress("stage2 -> stage3: optimizing layouts").spawn();
+    // let mut pass = 1;
+    // while changed {
+    //     cu::progress!(bar, "pass {pass}");
+    //     changed = false;
+    //     for optimize_fn in OPTIMIZERS {
+    //         let mut ctx = OptimizeContext::default();
+    //         for (k, t) in &stage.types {
+    //             t.mark_non_eliminateable(*k, &mut ctx.non_eliminateable);
+    //         }
+    //         for si in stage.symbols.values() {
+    //             si.mark_non_eliminateable(&mut ctx.non_eliminateable);
+    //         }
+    //         let output = optimize_fn(stage, &ctx)?;
+    //         if output.apply(stage)? {
+    //             changed = true;
+    //             break; // restart optimization passes if something was optimized
+    //         }
+    //     }
+    //     if changed {
+    //         let deduped = algorithm::dedupe(
+    //             std::mem::take(&mut stage.types),
+    //             GoffBuckets::default(),
+    //             &mut stage.symbols,
+    //             None,
+    //             |data, buckets| data.map_goff(|k| Ok(buckets.primary_fallback(k))),
+    //         );
+    //         let deduped = cu::check!(deduped, "optimize_layout: dedupe failed")?;
+    //         stage.types = deduped;
+    //     }
+    //     pass += 1;
+    // }
+    // bar.done();
     Ok(())
 }
 
@@ -51,7 +57,7 @@ pub fn run(stage: &mut HStage) -> cu::Result<()> {
 // and re-evaluate everything - this will be slow, but otherwise the dependency will be weird
 
 static OPTIMIZERS: &[fn(&HStage, &OptimizeContext) -> cu::Result<OptimizeOutput>] = &[
-    optimize_union_fewer_than_2_members,
+    // optimize_union_fewer_than_2_members,
     // optimize_single_member_struct,
     // optimize_single_type_union,
     // optimize_single_base_member_struct,
@@ -191,114 +197,114 @@ impl Eliminations {
     }
 }
 
-/// Eliminate unions with fewer than 2 members
-fn optimize_union_fewer_than_2_members(
-    stage: &HStage,
-    ctx: &OptimizeContext,
-) -> cu::Result<OptimizeOutput> {
-    let mut output = OptimizeOutput::default();
-    for (k, t) in &stage.types {
-        if output.will_change(*k) {
-            output.force_rerun = true;
-            continue;
-        }
-        let HType::Union(HTypeData { fqnames, data }) = t else {
-            continue;
-        };
-        match data.members.len() {
-            0 => {
-                output.change_fn(*k, move |t| {
-                    let HType::Union(HTypeData { fqnames, data }) = t else {
-                        cu::bail!("expected a union: {t:#?}");
-                    };
-                    // empty union is the same as an empty struct - a ZST (zero sized type, which has a
-                    // sizeof() of 1
-                    cu::ensure!(
-                        data.byte_size == 1,
-                        "expect empty union to be a ZST, but its size is {}",
-                        data.byte_size
-                    )?;
-                    Ok(HType::Struct(HTypeData {
-                        fqnames,
-                        data: Struct::zst_with_templates(data.template_args),
-                    }))
-                });
-            }
-            1 => {
-                // a union with only one member is equivalent to that member
-                let member = &data.members[0];
-                // give inner type names
-                if let Tree::Base(member_goff) = &member.ty {
-                    helper::give_names_to_base(stage, *member_goff, fqnames, &mut output);
-                }
-                output.eliminations.insert(*k, member.ty.clone(), ctx)?;
-            }
-            _ => {}
-        }
-    }
-    Ok(output)
-}
-
-/// Eliminate structs with only one member
-fn optimize_single_member_struct(
-    stage: &HStage,
-    ctx: &OptimizeContext,
-) -> cu::Result<OptimizeOutput> {
-    let mut output = OptimizeOutput::default();
-    for (k, t) in &stage.types {
-        let HType::Struct(HTypeData { data, fqnames }) = t else {
-            continue;
-        };
-        if data.members.len() != 1 {
-            continue;
-        }
-        if !data.vtable.is_empty() {
-            continue;
-        }
-        let member = &data.members[0];
-        // for single member, it should equal to size of the member
-        let self_size = data.byte_size;
-
-        let member_size = stage.sizes.get_tree(&member.ty)?;
-        cu::ensure!(
-            self_size == member_size,
-            "{k}: self_size={self_size}, member_size={member_size}"
-        )?;
-        // give inner type name if it's anonymous
-        if let Tree::Base(member_goff) = &member.ty {
-            helper::give_names_to_base(stage, *member_goff, fqnames, &mut output);
-        }
-        output.eliminations.insert(*k, member.ty.clone(), ctx)?;
-    }
-    Ok(output)
-}
-
-mod helper {
-    use super::*;
-
-    pub fn give_names_to_base(
-        stage: &HStage,
-        base_goff: Goff,
-        fqnames: &[FullQualName],
-        output: &mut OptimizeOutput,
-    ) {
-        let member_t = stage.types.get(&base_goff).unwrap();
-        if let Ok(member_fqnames) = member_t.fqnames() {
-            for base in member_fqnames {
-                for derived in fqnames {
-                    output
-                        .add_is_derived_names
-                        .push((derived.clone(), base.clone()));
-                }
-            }
-            let fqnames = fqnames.to_vec();
-            output.change_fn(base_goff, move |mut t| {
-                t.add_fqnames(fqnames);
-                Ok(t)
-            });
-        }
-    }
-}
+// /// Eliminate unions with fewer than 2 members
+// fn optimize_union_fewer_than_2_members(
+//     stage: &HStage,
+//     ctx: &OptimizeContext,
+// ) -> cu::Result<OptimizeOutput> {
+//     let mut output = OptimizeOutput::default();
+//     for (k, t) in &stage.types {
+//         if output.will_change(*k) {
+//             output.force_rerun = true;
+//             continue;
+//         }
+//         let HType::Union(HTypeData { fqnames, data }) = t else {
+//             continue;
+//         };
+//         match data.members.len() {
+//             0 => {
+//                 output.change_fn(*k, move |t| {
+//                     let HType::Union(HTypeData { fqnames, data }) = t else {
+//                         cu::bail!("expected a union: {t:#?}");
+//                     };
+//                     // empty union is the same as an empty struct - a ZST (zero sized type, which has a
+//                     // sizeof() of 1
+//                     cu::ensure!(
+//                         data.byte_size == 1,
+//                         "expect empty union to be a ZST, but its size is {}",
+//                         data.byte_size
+//                     )?;
+//                     Ok(HType::Struct(HTypeData {
+//                         fqnames,
+//                         data: Struct::zst_with_templates(data.template_args),
+//                     }))
+//                 });
+//             }
+//             1 => {
+//                 // a union with only one member is equivalent to that member
+//                 let member = &data.members[0];
+//                 // give inner type names
+//                 if let Tree::Base(member_goff) = &member.ty {
+//                     helper::give_names_to_base(stage, *member_goff, fqnames, &mut output);
+//                 }
+//                 output.eliminations.insert(*k, member.ty.clone(), ctx)?;
+//             }
+//             _ => {}
+//         }
+//     }
+//     Ok(output)
+// }
+//
+// /// Eliminate structs with only one member
+// fn optimize_single_member_struct(
+//     stage: &HStage,
+//     ctx: &OptimizeContext,
+// ) -> cu::Result<OptimizeOutput> {
+//     let mut output = OptimizeOutput::default();
+//     for (k, t) in &stage.types {
+//         let HType::Struct(HTypeData { data, fqnames }) = t else {
+//             continue;
+//         };
+//         if data.members.len() != 1 {
+//             continue;
+//         }
+//         if !data.vtable.is_empty() {
+//             continue;
+//         }
+//         let member = &data.members[0];
+//         // for single member, it should equal to size of the member
+//         let self_size = data.byte_size;
+//
+//         let member_size = stage.sizes.get_tree(&member.ty)?;
+//         cu::ensure!(
+//             self_size == member_size,
+//             "{k}: self_size={self_size}, member_size={member_size}"
+//         )?;
+//         // give inner type name if it's anonymous
+//         if let Tree::Base(member_goff) = &member.ty {
+//             helper::give_names_to_base(stage, *member_goff, fqnames, &mut output);
+//         }
+//         output.eliminations.insert(*k, member.ty.clone(), ctx)?;
+//     }
+//     Ok(output)
+// }
+//
+// mod helper {
+//     use super::*;
+//
+//     pub fn give_names_to_base(
+//         stage: &HStage,
+//         base_goff: Goff,
+//         fqnames: &[FullQualName],
+//         output: &mut OptimizeOutput,
+//     ) {
+//         let member_t = stage.types.get(&base_goff).unwrap();
+//         if let Ok(member_fqnames) = member_t.fqnames() {
+//             for base in member_fqnames {
+//                 for derived in fqnames {
+//                     output
+//                         .add_is_derived_names
+//                         .push((derived.clone(), base.clone()));
+//                 }
+//             }
+//             let fqnames = fqnames.to_vec();
+//             output.change_fn(base_goff, move |mut t| {
+//                 t.add_fqnames(fqnames);
+//                 Ok(t)
+//             });
+//         }
+//     }
+// }
 
 // /// collapse the union if all members are the same type
 // fn optimize_single_type_union(stage: &MStage, ctx: &OptimizeContext) -> cu::Result<OptimizeOutput> {

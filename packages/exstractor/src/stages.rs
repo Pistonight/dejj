@@ -180,13 +180,14 @@ pub struct HStage {
     pub config: Arc<Config>,
     pub symbols: BTreeMap<String, SymbolInfo>,
     /// Size of each type, cached for convenience
-    pub sizes: SizeMap,
+    pub sizes: Arc<SizeMap>,
     /// Relationship of the names
     pub name_graph: NameGraph,
 }
 
 /// Mid-level (M) type stage
 pub struct MStage {
+    pub is_cache_hit: bool,
     pub offset: usize,
     pub name: String,
     pub types: GoffMap<MType>,
@@ -210,6 +211,7 @@ impl MStage {
             }
         }
         Ok(Self {
+            is_cache_hit: false,
             offset: 0,
             name: String::new(),
             types: self.types,

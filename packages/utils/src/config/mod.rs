@@ -10,6 +10,8 @@ use tyyaml::Prim;
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
+    #[serde(default)]
+    pub hash: u64,
     pub paths: PathsConfig,
     pub extract: ExtractConfig,
 }
@@ -19,7 +21,10 @@ impl Config {
     pub fn load(path: impl AsRef<Path>) -> cu::Result<Self> {
         let path = path.as_ref();
         let file_content = cu::fs::read_string(path)?;
+        let hash = fxhash::hash64(&file_content);
         let mut config = toml::parse::<Config>(&file_content)?;
+        config.hash = hash;
+
 
         let base = path.parent_abs()?;
         config.paths.resolve_paths(&base)?;

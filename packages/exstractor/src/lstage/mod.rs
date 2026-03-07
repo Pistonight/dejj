@@ -3,13 +3,26 @@ use exstructs::algorithm;
 use exstructs::{Enum, GoffBuckets, GoffMap, GoffSet, LType, MType, MTypeData, MTypeDecl};
 use llvmutils::{CompileCommand, NameParser};
 
+use crate::stage_cache::LStageToMStageCache;
 use crate::stages::{LStage, MStage};
 
 mod clean_typedefs;
 mod flatten_trees;
 mod resolve_enum_sizes;
 
-pub async fn to_mstage(mut stage: LStage, command: CompileCommand) -> cu::Result<MStage> {
+pub async fn to_mstage(stage: LStage, command: CompileCommand) -> cu::Result<MStage> {
+    let cache = cu::check!(LStageToMStageCache::try_new(&stage), "failed to create l2mcache for {}", stage.name)?;
+    let cached_mstage = cu::check!(cache.load_cache(&stage), "failed to load l2mcache for {}", stage.name)?;
+    if let Some(x) = cached_mstage {
+        return Ok(x);
+    }
+    let mstage = to_mstage_internal(stage, command).await?;
+    // save cache
+    cu::check!(cache.save_cache(&mstage), "failed to save l2mcache for {}", mstage.name)?;
+    Ok(mstage)
+}
+
+async fn to_mstage_internal(mut stage: LStage, command: CompileCommand) -> cu::Result<MStage> {
     cu::check!(
         resolve_enum_sizes::run(&mut stage),
         "stage1: resolve_enum_sizes failed"
@@ -197,6 +210,7 @@ pub async fn to_mstage(mut stage: LStage, command: CompileCommand) -> cu::Result
     let deduped = cu::check!(deduped, "stage1: final deduped failed")?;
 
     Ok(MStage {
+        is_cache_hit: false,
         offset: stage.offset,
         name: stage.name,
         types: deduped,

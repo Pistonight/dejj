@@ -45,7 +45,7 @@ impl NamespaceStack {
 
 /// Load the namespaces in this compilation unit as a global offset map
 pub fn load_namespaces(unit: &Unit) -> cu::Result<NamespaceMaps> {
-    cu::debug!("loading namespaces for {unit}");
+    cu::trace!("loading namespaces for {unit}");
     let mut ctx = LoadNamespaceCtx::default();
     cu::check!(
         load_namespaces_root(unit, &mut ctx),

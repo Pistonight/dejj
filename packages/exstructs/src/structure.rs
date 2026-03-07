@@ -1,8 +1,7 @@
-use std::sync::Arc;
-
+use cu::pre::*;
 use tyyaml::{Prim, Tree};
 
-use crate::{FullQualName, Goff, Namespace, NamespacedName, NamespacedTemplatedName, TemplateArg};
+use crate::{ArcStr, FullQualName, Goff, Namespace, NamespacedName, NamespacedTemplatedName, TemplateArg};
 
 /// High-level (H) Type data
 ///
@@ -62,7 +61,7 @@ pub struct HTypeData<T> {
 ///   primitive, enum, union or struct.
 /// - Typedefs to composite types are eliminated
 /// - Other typedefs have their names merged into the target
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum MType {
     /// Pritimive type
     Prim(Prim),
@@ -82,7 +81,7 @@ pub enum MType {
 }
 
 /// Data of an MType
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct MTypeData<T> {
     /// The name; does not include template args; None means anonymous
     pub name: Option<NamespacedName>,
@@ -93,7 +92,7 @@ pub struct MTypeData<T> {
 }
 
 /// Declaration data of an MType
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct MTypeDecl {
     /// Primary name, includes template args
     pub name: NamespacedTemplatedName,
@@ -108,7 +107,7 @@ pub struct MTypeDecl {
 /// - Trees are not flattened: for example, A Tree::Base could be pointing to a Goff
 ///   that is a pointer type.
 /// - Templates are not parsed: Declarations and typedefs could have templates embedded in the name
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum LType {
     /// Pritimive type
     Prim(Prim),
@@ -139,7 +138,7 @@ pub enum LType {
 }
 
 /// Data of a LType
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct LTypeData<T> {
     /// The name; does not include template args; None means anonymous
     pub name: Option<NamespacedName>,
@@ -148,7 +147,7 @@ pub struct LTypeData<T> {
 }
 
 /// Declaration data of a LType
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct LTypeDecl {
     /// The enclosing namespace that is required to resolve the names
     /// in the template args
@@ -158,7 +157,7 @@ pub struct LTypeDecl {
 }
 
 /// Data of an `enum`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Enum {
     /// Base type, used to determine the size
     pub byte_size: u32,
@@ -167,7 +166,7 @@ pub struct Enum {
 }
 
 /// An enum with size not-yet fully determined (could be linked to another type)
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct EnumUndeterminedSize {
     /// Base type, used to determine the size
     pub byte_size_or_base: Result<u32, Goff>,
@@ -176,7 +175,7 @@ pub struct EnumUndeterminedSize {
 }
 
 /// Data of a `union`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Union {
     /// Byte size of the union (should be size of the largest member)
     pub byte_size: u32,
@@ -187,7 +186,7 @@ pub struct Union {
 }
 
 /// Data of a `struct` or `class`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Struct {
     /// Byte size of the struct
     pub byte_size: u32,
@@ -215,10 +214,10 @@ impl Struct {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Enumerator {
     /// Name of the enumerator
-    pub name: Arc<str>,
+    pub name: ArcStr,
     /// Value of the enumerator. If the enumerator is unsigned
     /// and the value is greater than `i64::MAX`, then it's stored
     /// as if it's a `u64`. Enum type of byte size greater than 8
@@ -227,12 +226,12 @@ pub struct Enumerator {
 }
 
 /// A struct or union member
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Member {
     /// Offset of the member within the struct. 0 For union.
     pub offset: u32,
     /// Name of the member. Could be None for anonymous typed member
-    pub name: Option<Arc<str>>,
+    pub name: Option<ArcStr>,
     /// Type of the member. Might be unflattened, depending on the stage
     pub ty: Tree<Goff>,
     /// Special-case member, None for union
@@ -245,7 +244,7 @@ impl Member {
 }
 
 /// Special member type
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum SpecialMember {
     Base,
     Vfptr,
@@ -253,10 +252,10 @@ pub enum SpecialMember {
 }
 
 /// An entry in the virtual function table
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct VtableEntry {
     /// Name of the virtual function
-    pub name: Arc<str>,
+    pub name: ArcStr,
     /// Types to make up the subroutine type
     pub function_types: Vec<Tree<Goff>>,
 }
