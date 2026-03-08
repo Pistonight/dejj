@@ -1,7 +1,9 @@
 use cu::pre::*;
 use tyyaml::{Prim, Tree};
 
-use crate::{ArcStr, FullQualName, Goff, Namespace, NamespacedName, NamespacedTemplatedName, TemplateArg};
+use crate::{
+    ArcStr, FullQualName, Goff, Namespace, NamespacedName, NamespacedTemplatedName, TemplateArg,
+};
 
 /// High-level (H) Type data
 ///
@@ -63,7 +65,18 @@ mod imp_mtype {
     ///   primitive, enum, union or struct.
     /// - Typedefs to composite types are eliminated
     /// - Other typedefs have their names merged into the target
-    #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+    #[derive(
+        Debug,
+        Clone,
+        PartialEq,
+        Eq,
+        Hash,
+        Serialize,
+        Deserialize,
+        rkyv::Archive,
+        rkyv::Serialize,
+        rkyv::Deserialize,
+    )]
     pub enum MType {
         /// Pritimive type
         Prim(Prim),
@@ -83,7 +96,18 @@ mod imp_mtype {
     }
 
     /// Data of an MType
-    #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+    #[derive(
+        Debug,
+        Clone,
+        PartialEq,
+        Eq,
+        Hash,
+        Serialize,
+        Deserialize,
+        rkyv::Archive,
+        rkyv::Serialize,
+        rkyv::Deserialize,
+    )]
     pub struct MTypeData<T> {
         /// The name; does not include template args; None means anonymous
         pub name: Option<NamespacedName>,
@@ -94,7 +118,18 @@ mod imp_mtype {
     }
 
     /// Declaration data of an MType
-    #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+    #[derive(
+        Debug,
+        Clone,
+        PartialEq,
+        Eq,
+        Hash,
+        Serialize,
+        Deserialize,
+        rkyv::Archive,
+        rkyv::Serialize,
+        rkyv::Deserialize,
+    )]
     pub struct MTypeDecl {
         /// Primary name, includes template args
         pub name: NamespacedTemplatedName,
@@ -113,7 +148,18 @@ mod imp_ltype {
     /// - Trees are not flattened: for example, A Tree::Base could be pointing to a Goff
     ///   that is a pointer type.
     /// - Templates are not parsed: Declarations and typedefs could have templates embedded in the name
-    #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+    #[derive(
+        Debug,
+        Clone,
+        PartialEq,
+        Eq,
+        Hash,
+        Serialize,
+        Deserialize,
+        rkyv::Archive,
+        rkyv::Serialize,
+        rkyv::Deserialize,
+    )]
     #[rkyv(compare(PartialEq))]
     pub enum LType {
         /// Pritimive type

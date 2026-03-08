@@ -9,7 +9,9 @@ mod imp {
     use super::*;
 
     /// Data for all namespaces
-    #[derive(PartialEq, Serialize, Deserialize, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+    #[derive(
+        PartialEq, Serialize, Deserialize, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize,
+    )]
     #[rkyv(derive(PartialEq))]
     #[rkyv(compare(PartialEq))]
     pub struct NamespaceMaps {
@@ -71,7 +73,7 @@ mod imp {
     }
 }
 
-pub use imp::{NamespaceMaps, NamespacedName, Namespace, NameSeg};
+pub use imp::{NameSeg, Namespace, NamespaceMaps, NamespacedName};
 
 impl NamespacedName {
     pub fn prim(prim: Prim) -> Self {
@@ -104,7 +106,6 @@ impl NamespacedName {
         Ok(s)
     }
 }
-
 
 impl Namespace {
     pub fn parse_untemplated(s: &str) -> cu::Result<Self> {
@@ -148,7 +149,6 @@ impl Namespace {
         Ok(s)
     }
 }
-
 
 impl NameSeg {
     pub fn to_cpp_source(&self) -> cu::Result<Option<&str>> {

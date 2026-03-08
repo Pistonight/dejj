@@ -71,7 +71,6 @@ impl MapGoff for MType {
     }
 }
 
-
 impl LType {
     pub fn map_goff<F: Fn(Goff) -> cu::Result<Goff>>(&mut self, f: F) -> cu::Result<()> {
         let f: GoffMapFn = Box::new(f);

@@ -1,7 +1,9 @@
 //! Mark referenced types for sweeping
 
 use crate::{
-    Enum, EnumUndeterminedSize, FullQualName, Goff, GoffSet, HType, HTypeData, LType, LTypeData, LTypeDecl, MType, MTypeData, MTypeDecl, NameSeg, Namespace, NamespacedName, NamespacedTemplatedGoffName, NamespacedTemplatedName, Struct, SymbolInfo, TemplateArg, Union
+    Enum, EnumUndeterminedSize, FullQualName, Goff, GoffSet, HType, HTypeData, LType, LTypeData,
+    LTypeDecl, MType, MTypeData, MTypeDecl, NameSeg, Namespace, NamespacedName,
+    NamespacedTemplatedGoffName, NamespacedTemplatedName, Struct, SymbolInfo, TemplateArg, Union,
 };
 
 pub trait Mark {
@@ -278,8 +280,11 @@ impl NameSeg {
     pub fn mark_all(&self, marked: &mut GoffSet) {
         match self {
             NameSeg::Type(goff, _) => {
-                marked.insert(*goff);}
-            NameSeg::Subprogram(goff, _, _) => {marked.insert(*goff);}
+                marked.insert(*goff);
+            }
+            NameSeg::Subprogram(goff, _, _) => {
+                marked.insert(*goff);
+            }
             NameSeg::Name(_) => {}
             NameSeg::Anonymous => {}
         }

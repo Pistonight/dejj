@@ -7,5 +7,5 @@ mod hstage;
 mod lstage;
 mod mstage;
 
-mod stages;
 mod stage_cache;
+mod stages;

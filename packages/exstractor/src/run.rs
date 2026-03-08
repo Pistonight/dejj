@@ -19,7 +19,10 @@ pub fn run(config: Config) -> cu::Result<()> {
     cu::fs::make_dir(&config.paths.extract_output)?;
     // build the project to generate the ELF
     // usually this should be fast since the build is incremental
-    cu::check!(build_project(&config), "failed to execute build command, please ensure the decomp project is in a clean state.")?;
+    cu::check!(
+        build_project(&config),
+        "failed to execute build command, please ensure the decomp project is in a clean state."
+    )?;
 
     let config = Arc::new(config);
 
@@ -124,7 +127,6 @@ pub fn run(config: Config) -> cu::Result<()> {
             let pool = cu::co::pool(-1);
             let mut output = Vec::with_capacity(stages.len());
 
-
             for stage in stages {
                 let name = &stage.name;
                 let command = cu::check!(
@@ -133,7 +135,8 @@ pub fn run(config: Config) -> cu::Result<()> {
                 )?;
                 let command = command.clone();
                 let cache = Arc::clone(&cache);
-                let handle = pool.spawn(async move { lstage::to_mstage(stage, command, &cache).await });
+                let handle =
+                    pool.spawn(async move { lstage::to_mstage(stage, command, &cache).await });
                 handles.push(handle);
             }
 
@@ -149,7 +152,11 @@ pub fn run(config: Config) -> cu::Result<()> {
         })?;
 
         let cache_hit_count = stages.iter().filter(|x| x.is_cache_hit).count();
-        cu::info!("stage1: l2mcache hit {} of {} compilation units", cache_hit_count, stages.len());
+        cu::info!(
+            "l2mcache hit {} of {} compilation units",
+            cache_hit_count,
+            stages.len()
+        );
         cache1.save()?;
         stages
     };
@@ -160,11 +167,11 @@ pub fn run(config: Config) -> cu::Result<()> {
         save_debug(&stage.types, &config.paths.extract_output, "mstage");
     }
 
-    let stage = hstage::from_mstage(stage)?;
-    // StageInfo::hstage3(&stage).print();
-    // if config.extract.debug.hstage {
-    //     save_debug(&stage.types, &config.paths.extract_output, "hstage");
-    // }
+    let stage = cu::co::run(async move { hstage::from_mstage(stage).await })?;
+    StageInfo::hstage3(&stage).print();
+    if config.extract.debug.hstage {
+        save_debug(&stage.types, &config.paths.extract_output, "hstage");
+    }
 
     cu::hint!("todo");
 
@@ -175,19 +182,17 @@ fn build_project(config: &Config) -> cu::Result<()> {
     // unwrap: config is validated
     let build_bin = config.extract.build_command.first().unwrap();
     let command = Path::new(build_bin)
-            .command()
-            .args(config.extract.build_command.iter().skip(1))
-            .current_dir(&config.paths.build_dir);
+        .command()
+        .args(config.extract.build_command.iter().skip(1))
+        .current_dir(&config.paths.build_dir);
     if config.extract.build_command_inherit_io {
         cu::info!("building project");
-        command
-            .all_inherit()
-            .wait_nz()?;
+        command.all_inherit().wait_nz()?;
     } else {
         let (child, bar, _) = command
-        .stdoe(cu::pio::spinner("building project"))
-        .stdin_null()
-        .spawn()?;
+            .stdoe(cu::pio::spinner("building project"))
+            .stdin_null()
+            .spawn()?;
         child.wait_nz()?;
         bar.done();
     }

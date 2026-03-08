@@ -34,7 +34,6 @@ pub struct NamespacedTemplatedGoffName {
     pub templates: Vec<TemplateArg<Goff>>,
 }
 
-
 mod imp {
     use super::*;
 
@@ -111,4 +110,3 @@ mod imp {
     }
 }
 pub use imp::{NamespacedTemplatedName, TemplateArg};
-

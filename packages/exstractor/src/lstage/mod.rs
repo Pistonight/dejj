@@ -10,15 +10,27 @@ mod clean_typedefs;
 mod flatten_trees;
 mod resolve_enum_sizes;
 
-pub async fn to_mstage(stage: LStage, command: CompileCommand, cache: &L2mCache) -> cu::Result<MStage> {
+pub async fn to_mstage(
+    stage: LStage,
+    command: CompileCommand,
+    cache: &L2mCache,
+) -> cu::Result<MStage> {
     cu::trace!("converting lstage to mstage: {}", stage.name);
-    let cached_mstage = cu::check!(cache.get(&stage), "failed to load l2mcache for {}", stage.name)?;
+    let cached_mstage = cu::check!(
+        cache.get(&stage),
+        "failed to load l2mcache for {}",
+        stage.name
+    )?;
     if let Some(x) = cached_mstage {
         return Ok(x);
     }
     let mstage = to_mstage_internal(stage, command).await?;
     // save cache
-    cu::check!(cache.set(&mstage), "failed to save l2mcache for {}", mstage.name)?;
+    cu::check!(
+        cache.set(&mstage),
+        "failed to save l2mcache for {}",
+        mstage.name
+    )?;
     Ok(mstage)
 }
 

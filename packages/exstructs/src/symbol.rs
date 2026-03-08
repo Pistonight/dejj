@@ -7,7 +7,18 @@ use crate::{Goff, TemplateArg};
 mod imp {
     use super::*;
     /// Information of a global symbol
-    #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+    #[derive(
+        Debug,
+        Clone,
+        PartialEq,
+        Eq,
+        Hash,
+        Serialize,
+        Deserialize,
+        rkyv::Archive,
+        rkyv::Serialize,
+        rkyv::Deserialize,
+    )]
     #[rkyv(derive(PartialEq))]
     #[rkyv(compare(PartialEq))]
     pub struct SymbolInfo {

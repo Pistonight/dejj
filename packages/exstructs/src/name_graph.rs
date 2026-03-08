@@ -42,12 +42,11 @@ impl NameGraph {
         Ok(())
     }
 
-    pub fn iter_derived(&self) -> impl Iterator<Item=(&FullQualName, &FullQualName)> {
-        self.is_derived.iter().map(|(a, b)| {
-            (self.names.get(a).unwrap(), self.names.get(b).unwrap())
-        })
+    pub fn iter_derived(&self) -> impl Iterator<Item = (&FullQualName, &FullQualName)> {
+        self.is_derived
+            .iter()
+            .map(|(a, b)| (self.names.get(a).unwrap(), self.names.get(b).unwrap()))
     }
-    
 }
 
 #[derive(Default, Clone)]
@@ -66,7 +65,7 @@ impl Edges {
         self.0.entry(edge.0).or_default().insert(edge.1)
     }
 
-    pub fn iter(&self) -> impl Iterator<Item=(usize, usize)> {
+    pub fn iter(&self) -> impl Iterator<Item = (usize, usize)> {
         self.0.iter().flat_map(|(k, v)| v.iter().map(|v| (*k, *v)))
     }
 }

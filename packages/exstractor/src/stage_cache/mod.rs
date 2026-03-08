@@ -4,38 +4,43 @@ use std::sync::Arc;
 
 use cu::pre::*;
 use dashmap::DashMap;
-use dejj_utils::{Config, persist_map::{BinaryFileStorage, JsonDirStorage, PersistMap, PersistMapStorage}};
-use exstructs::{Goff, GoffMap, GoffMapFn, GoffSet, LType, MType, NamespaceMaps, SymbolInfo, algorithm::MapGoff};
+use dejj_utils::{
+    Config,
+    persist_map::{BinaryFileStorage, JsonDirStorage, PersistMap, PersistMapStorage},
+};
+use exstructs::{
+    Goff, GoffMap, GoffMapFn, GoffSet, LType, MType, NamespaceMaps, SymbolInfo, algorithm::MapGoff,
+};
 use rkyv::rancor;
 
 use crate::stages::{LStage, MStage};
 
 pub enum L2mCache {
     Json(L2mCacheCore<JsonDirStorage>),
-    Binary(L2mCacheCore<BinaryFileStorage>)
+    Binary(L2mCacheCore<BinaryFileStorage>),
 }
 impl L2mCache {
     pub fn open(config: &Config) -> cu::Result<Self> {
+        let bar = cu::progress("loading l2mcache").keep(false).spawn();
         if config.extract.debug.l2mcache {
             cu::hint!("l2mcache debugging is enabled, the cache will be stored in JSON");
-            cu::progress("loading l2mcache").keep(false).spawn();
             let cache_location = config.paths.extract_output.join("l2mcache.json");
-            Ok(Self::Json(L2mCacheCore::open(&cache_location)?))
+            let cache = L2mCacheCore::open(&cache_location)?;
+            bar.done();
+            Ok(Self::Json(cache))
         } else {
             let cache_location = config.paths.extract_output.join("l2mcache.bin");
-            Ok(Self::Binary(L2mCacheCore::open(&cache_location)?))
+            let cache = L2mCacheCore::open(&cache_location)?;
+            bar.done();
+            Ok(Self::Binary(cache))
         }
     }
     pub fn get(&self, lstage: &LStage) -> cu::Result<Option<MStage>> {
         let (cache_key, goffs) = self.preprocess_lstage(lstage)?;
         let ldata = LStageCacheData::try_new(lstage, &goffs)?;
         let mstage = match self {
-            L2mCache::Json(c) => {
-                c.try_restore_from_cache(lstage, &cache_key, &ldata, &goffs)?
-            }
-            L2mCache::Binary(c) => {
-                c.try_restore_from_cache(lstage, &cache_key, &ldata, &goffs)?
-            }
+            L2mCache::Json(c) => c.try_restore_from_cache(lstage, &cache_key, &ldata, &goffs)?,
+            L2mCache::Binary(c) => c.try_restore_from_cache(lstage, &cache_key, &ldata, &goffs)?,
         };
         if mstage.is_some() {
             return Ok(mstage);
@@ -44,7 +49,7 @@ impl L2mCache {
         let entry = L2mCacheEntry {
             goffs,
             ldata,
-            mdata: Default::default()
+            mdata: Default::default(),
         };
         match self {
             L2mCache::Json(c) => {
@@ -60,13 +65,13 @@ impl L2mCache {
         let cache_key = Self::cache_key(&mstage.name)?;
         match self {
             L2mCache::Json(c) => c.set(cache_key, mstage),
-            L2mCache::Binary(c) => c.set(cache_key, mstage)
+            L2mCache::Binary(c) => c.set(cache_key, mstage),
         }
     }
     pub fn save(&self) -> cu::Result<()> {
         match self {
             L2mCache::Json(c) => c.save(),
-            L2mCache::Binary(c) => c.save()
+            L2mCache::Binary(c) => c.save(),
         }
     }
     fn preprocess_lstage(&self, lstage: &LStage) -> cu::Result<(String, Vec<Goff>)> {
@@ -102,14 +107,20 @@ pub struct L2mCacheCore<S: PersistMapStorage<String, L2mCacheEntry>> {
     store: PersistMap<String, L2mCacheEntry, S>,
     working: DashMap<String, L2mCacheEntry>,
 }
-impl<S:PersistMapStorage<String, L2mCacheEntry>> L2mCacheCore<S> {
+impl<S: PersistMapStorage<String, L2mCacheEntry>> L2mCacheCore<S> {
     pub fn open(path: &Path) -> cu::Result<Self> {
         let store = PersistMap::open(path)?;
-        Ok(Self{ store, working: Default::default() })
+        Ok(Self {
+            store,
+            working: Default::default(),
+        })
     }
 
     pub fn set(&self, cache_key: String, mstage: &MStage) -> cu::Result<()> {
-        let (_, mut entry) = cu::check!(self.working.remove(&cache_key), "cannot find working cache entry. get() must be called before trying to set()")?;
+        let (_, mut entry) = cu::check!(
+            self.working.remove(&cache_key),
+            "cannot find working cache entry. get() must be called before trying to set()"
+        )?;
         let mdata = MStageCacheData::try_new(mstage, &entry.goffs)?;
         entry.mdata = mdata;
         self.store.set(cache_key, entry)?;
@@ -119,12 +130,15 @@ impl<S:PersistMapStorage<String, L2mCacheEntry>> L2mCacheCore<S> {
     pub fn save(&self) -> cu::Result<()> {
         cu::check!(self.store.save(), "failed to save l2mcache")
     }
-
-
-
 }
 impl L2mCacheCore<JsonDirStorage> {
-    fn try_restore_from_cache(&self, lstage: &LStage, cache_key: &String, ldata: &LStageCacheData, goffs: &[Goff]) -> cu::Result<Option<MStage>> {
+    fn try_restore_from_cache(
+        &self,
+        lstage: &LStage,
+        cache_key: &String,
+        ldata: &LStageCacheData,
+        goffs: &[Goff],
+    ) -> cu::Result<Option<MStage>> {
         // see if an cached entry exists
         let cached = cu::check!(self.store.get(&cache_key), "error accessing json l2mcache")?;
         let cached = cu::some!(cached);
@@ -138,13 +152,22 @@ impl L2mCacheCore<JsonDirStorage> {
         }
         // cache hit, restore MStage
         let mdata = &cached.mdata;
-        let mstage = cu::check!(mdata.to_mstage(lstage, goffs), "failed to restore mstage from cache")?;
+        let mstage = cu::check!(
+            mdata.to_mstage(lstage, goffs),
+            "failed to restore mstage from cache"
+        )?;
         Ok(Some(mstage))
     }
 }
 
 impl L2mCacheCore<BinaryFileStorage> {
-    fn try_restore_from_cache(&self, lstage: &LStage, cache_key: &String, ldata: &LStageCacheData, goffs: &[Goff]) -> cu::Result<Option<MStage>> {
+    fn try_restore_from_cache(
+        &self,
+        lstage: &LStage,
+        cache_key: &String,
+        ldata: &LStageCacheData,
+        goffs: &[Goff],
+    ) -> cu::Result<Option<MStage>> {
         // see if an cached entry exists
         let cached = cu::check!(self.store.get(&cache_key), "error accessing json l2mcache")?;
         let cached = cu::some!(cached);
@@ -158,12 +181,17 @@ impl L2mCacheCore<BinaryFileStorage> {
         }
         // cache hit, restore MStage
         let mdata = &cached.mdata;
-        let mdata = cu::check!(rkyv::deserialize::<MStageCacheData, rancor::Error>(mdata), "failed to deserialize mstage from binary cache")?;
-        let mstage = cu::check!(mdata.to_mstage(lstage, goffs), "failed to restore mstage from cache")?;
+        let mdata = cu::check!(
+            rkyv::deserialize::<MStageCacheData, rancor::Error>(mdata),
+            "failed to deserialize mstage from binary cache"
+        )?;
+        let mstage = cu::check!(
+            mdata.to_mstage(lstage, goffs),
+            "failed to restore mstage from cache"
+        )?;
         Ok(Some(mstage))
     }
 }
-
 
 #[derive(Serialize, Deserialize, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 pub struct L2mCacheEntry {
@@ -242,7 +270,7 @@ pub struct L2mCacheEntry {
 struct MStageCacheData {
     pub config_hash: u64,
     pub normalized_types: GoffMap<MType>,
-    pub normalized_symbols: BTreeMap<String, SymbolInfo>
+    pub normalized_symbols: BTreeMap<String, SymbolInfo>,
 }
 
 impl MStageCacheData {
@@ -253,7 +281,7 @@ impl MStageCacheData {
         Ok(Self {
             config_hash: stage.config.hash,
             normalized_types,
-            normalized_symbols
+            normalized_symbols,
         })
     }
     pub fn to_mstage(&self, stage: &LStage, goffs: &[Goff]) -> cu::Result<MStage> {
@@ -262,7 +290,14 @@ impl MStageCacheData {
         let config = Arc::clone(&stage.config);
         let types = convert(&self.normalized_types, goffs, index2goff)?;
         let symbols = convert_nongoff(&self.normalized_symbols, goffs, index2goff)?;
-        Ok(MStage { is_cache_hit: true, offset, name, types, config, symbols })
+        Ok(MStage {
+            is_cache_hit: true,
+            offset,
+            name,
+            types,
+            config,
+            symbols,
+        })
     }
 }
 
@@ -272,7 +307,7 @@ struct LStageCacheData {
     pub config_hash: u64,
     pub normalized_types: GoffMap<LType>,
     pub normalized_namespaces: NamespaceMaps,
-    pub normalized_symbols: BTreeMap<String, SymbolInfo>
+    pub normalized_symbols: BTreeMap<String, SymbolInfo>,
 }
 
 impl LStageCacheData {
@@ -286,24 +321,22 @@ impl LStageCacheData {
         Ok(Self {
             config_hash: stage.config.hash,
             normalized_types,
-            normalized_namespaces: NamespaceMaps { 
+            normalized_namespaces: NamespaceMaps {
                 qualifiers: normalized_ns_qualifiers,
                 namespaces: normalized_ns_namespaces,
                 by_src: normalized_ns_by_src,
             },
-            normalized_symbols
+            normalized_symbols,
         })
     }
 }
 
-fn convert<
-T: MapGoff + Clone,
->(data: &GoffMap<T>, goffs: &[Goff], 
-    convert_fn:
-    fn (Goff, &[Goff]) -> cu::Result<Goff>
-
+fn convert<T: MapGoff + Clone>(
+    data: &GoffMap<T>,
+    goffs: &[Goff],
+    convert_fn: fn(Goff, &[Goff]) -> cu::Result<Goff>,
 ) -> cu::Result<GoffMap<T>> {
-    let mut converted= GoffMap::new();
+    let mut converted = GoffMap::new();
     let map_fn: GoffMapFn = Box::new(|k| Ok(convert_fn(k, &goffs)?));
     for (k, t) in data {
         let conv_k = convert_fn(*k, &goffs)?;
@@ -315,11 +348,12 @@ T: MapGoff + Clone,
     Ok(converted)
 }
 
-fn convert_nongoff<K: Clone + Ord, T: MapGoff + Clone>(data: &BTreeMap<K, T>, goffs: &[Goff],
-    convert_fn:
-    fn (Goff, &[Goff]) -> cu::Result<Goff>
+fn convert_nongoff<K: Clone + Ord, T: MapGoff + Clone>(
+    data: &BTreeMap<K, T>,
+    goffs: &[Goff],
+    convert_fn: fn(Goff, &[Goff]) -> cu::Result<Goff>,
 ) -> cu::Result<BTreeMap<K, T>> {
-    let mut converted= BTreeMap::new();
+    let mut converted = BTreeMap::new();
     let map_fn: GoffMapFn = Box::new(|k| Ok(convert_fn(k, &goffs)?));
     for (k, t) in data {
         let mut conv_t = t.clone();
@@ -333,10 +367,13 @@ fn convert_nongoff<K: Clone + Ord, T: MapGoff + Clone>(data: &BTreeMap<K, T>, go
 fn goff2index(goff: Goff, goffs: &[Goff]) -> cu::Result<Goff> {
     match goffs.binary_search(&goff) {
         Ok(i) => Ok(Goff(i)),
-        Err(_) => cu::bail!("unexpected unmarked type {goff} when normalizing")
+        Err(_) => cu::bail!("unexpected unmarked type {goff} when normalizing"),
     }
 }
 
 fn index2goff(index: Goff, goffs: &[Goff]) -> cu::Result<Goff> {
-    cu::check!(goffs.get(index.0).copied(), "index out of bound when converting to goff: {index}")
+    cu::check!(
+        goffs.get(index.0).copied(),
+        "index out of bound when converting to goff: {index}"
+    )
 }

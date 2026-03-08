@@ -1,9 +1,9 @@
+use std::collections::BTreeMap;
 use std::hash::Hash;
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::collections::BTreeMap;
 
 use cu::pre::*;
 use dashmap::DashMap;
@@ -243,8 +243,8 @@ where
                 }
             }
         }
-            let mut bytes = AlignedVec::new();
-            bytes.extend_from_reader(&mut cu::fs::reader(path)?)?;
+        let mut bytes = AlignedVec::new();
+        bytes.extend_from_reader(&mut cu::fs::reader(path)?)?;
         // validate the bytes
         let archived = rkyv::access::<Archived<BTreeMap<K, V>>, rancor::Error>(&bytes);
         cu::check!(archived, "invalid binary cache file: '{}'", path.display())?;
@@ -334,7 +334,8 @@ where
 
     fn open(path: &Path) -> cu::Result<(DashMap<String, Self::Storage>, Self)>
     where
-        Self: Sized {
+        Self: Sized,
+    {
         match path.metadata() {
             Err(_) => {
                 return Ok(Default::default());
@@ -376,7 +377,8 @@ where
     ) -> cu::Result<Option<Self::ValueRef<'c>>>
     where
         'a: 'c,
-        'b: 'c {
+        'b: 'c,
+    {
         let entry = cu::some!(working.get(key));
         rkyv::access::<Archived<V>, rancor::Error>(entry.value())?;
         Ok(Some(DashRefRkyvAccessor(entry, PhantomData)))
@@ -387,7 +389,10 @@ where
     }
 }
 
-pub struct DashRefRkyvAccessor<'a, K, V: Archive>(dashmap::mapref::one::Ref<'a, K, AlignedVec>, PhantomData<V>);
+pub struct DashRefRkyvAccessor<'a, K, V: Archive>(
+    dashmap::mapref::one::Ref<'a, K, AlignedVec>,
+    PhantomData<V>,
+);
 impl<K: Hash + Eq, V: Archive> Deref for DashRefRkyvAccessor<'_, K, V> {
     type Target = Archived<V>;
     fn deref(&self) -> &Self::Target {

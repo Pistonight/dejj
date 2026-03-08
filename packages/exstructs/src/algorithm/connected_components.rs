@@ -6,12 +6,12 @@ use crate::{Goff, GoffMap, GoffSet, HType, SymbolInfo};
 
 pub struct ConnectedComponent {
     pub types: Vec<Goff>,
-    pub symbols: Vec<String>
+    pub symbols: Vec<String>,
 }
 
 pub fn calc_connected_components(
     types: &GoffMap<HType>,
-    symbols: &BTreeMap<String, SymbolInfo>
+    symbols: &BTreeMap<String, SymbolInfo>,
 ) -> cu::Result<Vec<ConnectedComponent>> {
     let mut remaining_keys: GoffSet = types.keys().copied().collect();
     let mut marked = GoffSet::new();
@@ -29,7 +29,10 @@ pub fn calc_connected_components(
         loop {
             let len_before = marked.len();
             for k in newly_marked.iter().copied().collect::<Vec<_>>() {
-                let t = cu::check!(types.get(&k), "unexpected unconnected type goff {k} (while marking forward)")?;
+                let t = cu::check!(
+                    types.get(&k),
+                    "unexpected unconnected type goff {k} (while marking forward)"
+                )?;
                 t.mark(k, &mut newly_marked);
             }
             marked.extend(newly_marked.iter().copied());
@@ -51,7 +54,10 @@ pub fn calc_connected_components(
                     continue;
                 }
                 newly_marked.clear();
-                let t = cu::check!(types.get(k), "unexpected unconnected type goff {k} (while marking backward)")?;
+                let t = cu::check!(
+                    types.get(k),
+                    "unexpected unconnected type goff {k} (while marking backward)"
+                )?;
                 let k = *k;
                 t.mark(k, &mut newly_marked);
                 if newly_marked.intersection(&marked).next().is_some() {
@@ -82,8 +88,10 @@ pub fn calc_connected_components(
             remaining_keys.remove(k);
         }
         let new_symbols = marked_symbols.iter().map(|x| x.to_string()).collect();
-        components.push(ConnectedComponent { types: new_keys, symbols: new_symbols });
-
+        components.push(ConnectedComponent {
+            types: new_keys,
+            symbols: new_symbols,
+        });
     }
 
     Ok(components)
@@ -92,4 +100,3 @@ pub fn calc_connected_components(
 pub fn next_non_prim_goff(remaining: &GoffSet) -> Option<Goff> {
     remaining.iter().filter(|k| !k.is_prim()).next().copied()
 }
-

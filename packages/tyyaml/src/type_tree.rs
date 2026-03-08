@@ -64,7 +64,10 @@ mod imp {
         /// A pointer-to-member-function type
         ///
         /// TyYAML representation is `[ VALUE_TYPE_ID,CLASS_TYPE_ID,'::','()',[ ARG_TYPE, ...],'*' ]`
-        Ptmf(Repr /*base*/, #[rkyv(omit_bounds)] Vec<Self> /*[retty, args]*/),
+        Ptmf(
+            Repr,                           /*base*/
+            #[rkyv(omit_bounds)] Vec<Self>, /*[retty, args]*/
+        ),
     }
 }
 pub use imp::Tree;

@@ -4,7 +4,8 @@ use std::sync::Arc;
 use cu::pre::*;
 use dejj_utils::Config;
 use exstructs::{
-    ArcStr, EnumUndeterminedSize, Enumerator, Goff, GoffMap, LType, LTypeData, LTypeDecl, Member, NamespaceMaps, SpecialMember, Struct, SymbolInfo, TemplateArg, Union, VtableEntry
+    ArcStr, EnumUndeterminedSize, Enumerator, Goff, GoffMap, LType, LTypeData, LTypeDecl, Member,
+    NamespaceMaps, SpecialMember, Struct, SymbolInfo, TemplateArg, Union, VtableEntry,
 };
 use gimli::constants::*;
 use symlist::SymbolList;

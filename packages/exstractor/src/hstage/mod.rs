@@ -5,28 +5,50 @@ use exstructs::{GoffMap, HType, HTypeData, MType, SizeMap, Struct};
 use crate::stages::{HStage, MStage};
 use cu::pre::*;
 
+mod optimize;
 mod split;
 // mod optimize_layout;
-// mod optimize;
 
-pub fn from_mstage(stage: MStage) -> cu::Result<()> {
-    let mut stage = convert_from_mstage(stage)?;
-    let mut stages = cu::check!(split::run(stage), "failed to split hstage")?;
-    cu::info!("there are {} connected components to optimize in the type graph", stages.len());
+pub async fn from_mstage(stage: MStage) -> cu::Result<HStage> {
+    let stage = convert_from_mstage(stage)?;
+    let stages = cu::check!(split::run(stage), "failed to split hstage")?;
+    cu::info!(
+        "there are {} connected components to optimize in the type graph",
+        stages.len()
+    );
 
-    // // optimize each component in parallel
-    // // it's hard to parallelize each component because the types depend on each other
-    // // (and there could be circular references as well)
-    // {
-    //     let bar = cu::progress("stage2 -> stage3: optimizing layouts").spawn();
-    //     let pool = cu::co::pool(-1);
-    //     for component in components {
-    //         pool.spawn(async move {
-    //             optimize_component()
-    //         })
-    //     }
-    //
-    // }
+    // optimize each component in parallel
+    // it's hard to parallelize each component because the types depend on each other
+    // (and there could be circular references as well)
+    let stage = {
+        let bar = cu::progress("stage2 -> stage3: optimizing layouts")
+            .total(stages.len())
+            .spawn();
+        let pool = cu::co::pool(-1);
+        let mut handles = Vec::with_capacity(stages.len());
+        for stage in stages {
+            let handle = pool.spawn(async move { optimize::run(stage) });
+            handles.push(handle);
+        }
+
+        let mut stage = None;
+        let mut set = cu::co::set(handles);
+        while let Some(result) = set.next().await {
+            let result = cu::check!(result?, "failed to optimize types")?;
+            cu::progress!(bar += 1);
+            match &mut stage {
+                None => {
+                    stage = Some(result);
+                }
+                Some(stage) => {
+                    stage.types.extend(result.types);
+                    stage.symbols.extend(result.symbols);
+                    stage.name_graph.extend(&result.name_graph);
+                }
+            }
+        }
+        cu::check!(stage, "unexpected: there are no stages to optimize")?
+    };
 
     // cu::unimplemented!()
     //
@@ -34,8 +56,7 @@ pub fn from_mstage(stage: MStage) -> cu::Result<()> {
     //     optimize_layout::run(&mut stage),
     //     "failed to optimize type layouts"
     // )?;
-    // Ok(stage)
-    Ok(())
+    Ok(stage)
 }
 
 fn convert_from_mstage(stage: MStage) -> cu::Result<HStage> {
