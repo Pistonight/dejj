@@ -11,3 +11,4 @@ cu = { workspace = true, features = [ "parse", "derive" ] }
 tyyaml = { path = "../tyyaml" }
 fxhash.workspace = true
 serde.workspace = true
+rkyv.workspace = true

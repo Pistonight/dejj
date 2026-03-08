@@ -34,46 +34,81 @@ pub struct NamespacedTemplatedGoffName {
     pub templates: Vec<TemplateArg<Goff>>,
 }
 
-/// Name with namespace and templates. i.e. the fully qualified name (`foo::bar::Biz<T1, T2>`)
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct NamespacedTemplatedName {
-    /// The untemplated base name (with namespace)
-    pub base: NamespacedName,
-    /// The template types
-    pub templates: Vec<TemplateArg<NamespacedTemplatedName>>,
-}
-impl NamespacedTemplatedName {
-    pub fn new(base: NamespacedName) -> Self {
-        Self::with_templates(base, vec![])
-    }
-    pub fn with_templates(base: NamespacedName, templates: Vec<TemplateArg<Self>>) -> Self {
-        Self { base, templates }
-    }
-}
-impl TreeRepr for NamespacedTemplatedName {
-    fn serialize_spec(&self) -> cu::Result<String> {
-        Ok(json::stringify(self)?)
-    }
-    fn deserialize_void() -> Self {
-        Self::new(NamespacedName::unnamespaced("void"))
-    }
-    fn deserialize_spec(spec: &str) -> cu::Result<Self> {
-        Ok(json::parse(spec)?)
-    }
-}
 
-/// Template arguments (i.e. `template <...>`)
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Display, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum TemplateArg<T: TreeRepr> {
-    /// Constant value. Could also be boolean (0=false, 1=true)
-    #[display("{}", _0)]
-    Const(i64),
-    /// Type value. Could be unflattened depending on the stage
-    #[display("{}", _0)]
-    Type(Tree<T>),
+mod imp {
+    use super::*;
 
-    /// A constant value assigned by compiler (like a function address)
-    #[display("[static]")]
-    StaticConst,
+    /// Name with namespace and templates. i.e. the fully qualified name (`foo::bar::Biz<T1, T2>`)
+    #[rustfmt::skip]
+    #[derive(
+        Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash,
+        Serialize, Deserialize,
+        rkyv::Archive, rkyv::Serialize, rkyv::Deserialize
+    )]
+    #[rkyv(derive(PartialEq))]
+    #[rkyv(compare(PartialEq))]
+    #[rkyv(serialize_bounds(
+        __S: rkyv::ser::Writer + rkyv::ser::Allocator,
+        __S::Error: rkyv::rancor::Source,
+    ))]
+    #[rkyv(deserialize_bounds(__D::Error: rkyv::rancor::Source))]
+    #[rkyv(bytecheck(
+        bounds(
+            __C::Error: rkyv::rancor::Source,
+            __C: rkyv::validation::ArchiveContext,
+        )
+    ))]
+    pub struct NamespacedTemplatedName {
+        /// The untemplated base name (with namespace)
+        pub base: NamespacedName,
+        /// The template types
+        #[rkyv(omit_bounds)]
+        pub templates: Vec<TemplateArg<NamespacedTemplatedName>>,
+    }
+    impl NamespacedTemplatedName {
+        pub fn new(base: NamespacedName) -> Self {
+            Self::with_templates(base, vec![])
+        }
+        pub fn with_templates(base: NamespacedName, templates: Vec<TemplateArg<Self>>) -> Self {
+            Self { base, templates }
+        }
+    }
+    impl TreeRepr for NamespacedTemplatedName {
+        fn serialize_spec(&self) -> cu::Result<String> {
+            Ok(json::stringify(self)?)
+        }
+        fn deserialize_void() -> Self {
+            Self::new(NamespacedName::unnamespaced("void"))
+        }
+        fn deserialize_spec(spec: &str) -> cu::Result<Self> {
+            Ok(json::parse(spec)?)
+        }
+    }
+    /// Template arguments (i.e. `template <...>`)
+    #[rustfmt::skip]
+    #[derive(
+        Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash,
+        Display, Serialize, Deserialize,
+        rkyv::Archive, rkyv::Serialize, rkyv::Deserialize
+    )]
+    #[rkyv(derive(PartialEq))]
+    #[rkyv(compare(PartialEq))]
+    #[rkyv(archive_bounds(
+        <Tree<T> as rkyv::Archive>::Archived: PartialEq
+    ))]
+    #[serde(rename_all = "camelCase")]
+    pub enum TemplateArg<T: TreeRepr + rkyv::Archive> {
+        /// Constant value. Could also be boolean (0=false, 1=true)
+        #[display("{}", _0)]
+        Const(i64),
+        /// Type value. Could be unflattened depending on the stage
+        #[display("{}", _0)]
+        Type(Tree<T>),
+
+        /// A constant value assigned by compiler (like a function address)
+        #[display("[static]")]
+        StaticConst,
+    }
 }
+pub use imp::{NamespacedTemplatedName, TemplateArg};
+

@@ -99,29 +99,40 @@ impl<'de> Deserialize<'de> for Ty {
     }
 }
 
-/// A primitive TyYAML type id.
-///
-/// The `to_str`, `to_string` (`Display`), `serde::Serialize` to YAML, and the TyYAML representation,
-/// all have the same output.
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum Prim {
-    Void,
-    Bool,
-    U8,
-    U16,
-    U32,
-    U64,
-    U128,
-    I8,
-    I16,
-    I32,
-    I64,
-    I128,
-    F32,
-    F64,
-    F128,
+mod imp {
+    use super::*;
+
+    /// A primitive TyYAML type id.
+    ///
+    /// The `to_str`, `to_string` (`Display`), `serde::Serialize` to YAML, and the TyYAML representation,
+    /// all have the same output.
+    #[rustfmt::skip]
+    #[derive(
+        Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize,
+        rkyv::Archive, rkyv::Serialize, rkyv::Deserialize,
+    )]
+    #[rkyv(derive(PartialEq))]
+    #[rkyv(compare(PartialEq))]
+    #[serde(rename_all = "camelCase")]
+    pub enum Prim {
+        Void,
+        Bool,
+        U8,
+        U16,
+        U32,
+        U64,
+        U128,
+        I8,
+        I16,
+        I32,
+        I64,
+        I128,
+        F32,
+        F64,
+        F128,
+    }
 }
+pub use imp::Prim;
 
 impl Prim {
     pub fn iter() -> impl Iterator<Item = Prim> {

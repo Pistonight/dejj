@@ -5,20 +5,74 @@ use tyyaml::Prim;
 
 use crate::{ArcStr, Goff, GoffMap};
 
-/// Data for all namespaces
-#[derive(PartialEq, Serialize, Deserialize)]
-pub struct NamespaceMaps {
-    /// Goff to the qualifier that goff is in
-    pub qualifiers: GoffMap<Namespace>,
-    /// Goff to the namespace that goff is in (does not include types, etc)
-    pub namespaces: GoffMap<Namespace>,
-    /// Source string to namespace
-    pub by_src: BTreeMap<String, Namespace>,
+mod imp {
+    use super::*;
+
+    /// Data for all namespaces
+    #[derive(PartialEq, Serialize, Deserialize, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+    #[rkyv(derive(PartialEq))]
+    #[rkyv(compare(PartialEq))]
+    pub struct NamespaceMaps {
+        /// Goff to the qualifier that goff is in
+        pub qualifiers: GoffMap<Namespace>,
+        /// Goff to the namespace that goff is in (does not include types, etc)
+        pub namespaces: GoffMap<Namespace>,
+        /// Source string to namespace
+        pub by_src: BTreeMap<String, Namespace>,
+    }
+
+    #[rustfmt::skip]
+    #[derive(
+        Clone, PartialEq, Eq, PartialOrd, Ord, Hash,
+        DebugCustom, Serialize, Deserialize,
+        rkyv::Archive, rkyv::Serialize, rkyv::Deserialize
+    )]
+    #[rkyv(derive(PartialEq))]
+    #[rkyv(compare(PartialEq))]
+    #[debug("{}", self)]
+    pub struct NamespacedName(pub Namespace, pub ArcStr);
+
+    #[rustfmt::skip]
+    #[derive(
+        Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, 
+        DebugCustom, Serialize, Deserialize,
+        rkyv::Archive, rkyv::Serialize, rkyv::Deserialize
+    )]
+    #[rkyv(derive(PartialEq))]
+    #[rkyv(compare(PartialEq))]
+    #[debug("{}", self)]
+    pub struct Namespace(pub Vec<NameSeg>);
+
+    #[rustfmt::skip]
+    #[derive(
+        Clone, PartialEq, Eq, PartialOrd, Ord, Hash,
+        Display, DebugCustom, Serialize, Deserialize,
+        rkyv::Archive, rkyv::Serialize, rkyv::Deserialize
+    )]
+    #[rkyv(derive(PartialEq))]
+    #[rkyv(compare(PartialEq))]
+    #[serde(rename_all = "camelCase")]
+    pub enum NameSeg {
+        #[display("{}", _0)]
+        #[debug("{}", _0)]
+        Name(ArcStr),
+
+        #[display("[ty={}]", _0)]
+        #[debug("[ty={}]", _0)]
+        Type(Goff, ArcStr),
+
+        #[display("[subprogram={}]", _0)]
+        #[debug("[subprogram={}]", _0)]
+        Subprogram(Goff, ArcStr, bool /* is_linkage_name */),
+
+        #[display("[anonymous]")]
+        #[debug("[anonymous]")]
+        Anonymous,
+    }
 }
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, DebugCustom, Serialize, Deserialize)]
-#[debug("{}", self)]
-pub struct NamespacedName(pub Namespace, pub ArcStr);
+pub use imp::{NamespaceMaps, NamespacedName, Namespace, NameSeg};
+
 impl NamespacedName {
     pub fn prim(prim: Prim) -> Self {
         Self::unnamespaced(prim.to_str())
@@ -51,11 +105,7 @@ impl NamespacedName {
     }
 }
 
-#[derive(
-    Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, DebugCustom, Serialize, Deserialize,
-)]
-#[debug("{}", self)]
-pub struct Namespace(pub Vec<NameSeg>);
+
 impl Namespace {
     pub fn parse_untemplated(s: &str) -> cu::Result<Self> {
         cu::ensure!(
@@ -99,27 +149,6 @@ impl Namespace {
     }
 }
 
-#[derive(
-    Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Display, DebugCustom, Serialize, Deserialize,
-)]
-#[serde(rename_all = "camelCase")]
-pub enum NameSeg {
-    #[display("{}", _0)]
-    #[debug("{}", _0)]
-    Name(ArcStr),
-
-    #[display("[ty={}]", _0)]
-    #[debug("[ty={}]", _0)]
-    Type(Goff, ArcStr),
-
-    #[display("[subprogram={}]", _0)]
-    #[debug("[subprogram={}]", _0)]
-    Subprogram(Goff, ArcStr, bool /* is_linkage_name */),
-
-    #[display("[anonymous]")]
-    #[debug("[anonymous]")]
-    Anonymous,
-}
 
 impl NameSeg {
     pub fn to_cpp_source(&self) -> cu::Result<Option<&str>> {

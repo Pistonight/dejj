@@ -9,7 +9,7 @@ mod split;
 // mod optimize_layout;
 // mod optimize;
 
-pub fn from_mstage(stage: MStage) -> cu::Result<HStage> {
+pub fn from_mstage(stage: MStage) -> cu::Result<()> {
     let mut stage = convert_from_mstage(stage)?;
     let mut stages = cu::check!(split::run(stage), "failed to split hstage")?;
     cu::info!("there are {} connected components to optimize in the type graph", stages.len());
@@ -28,13 +28,14 @@ pub fn from_mstage(stage: MStage) -> cu::Result<HStage> {
     //
     // }
 
-    cu::unimplemented!()
+    // cu::unimplemented!()
     //
     // cu::check!(
     //     optimize_layout::run(&mut stage),
     //     "failed to optimize type layouts"
     // )?;
     // Ok(stage)
+    Ok(())
 }
 
 fn convert_from_mstage(stage: MStage) -> cu::Result<HStage> {

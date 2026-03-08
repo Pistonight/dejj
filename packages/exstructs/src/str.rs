@@ -2,31 +2,42 @@ use std::sync::Arc;
 
 use cu::pre::*;
 
-/// Serializable and deserializable shared string
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Deref, DerefMut, Display, DebugCustom)]
-#[display("{}", self.0)]
-#[debug("{:?}", self.0)]
-#[repr(transparent)]
-pub struct ArcStr(Arc<str>);
-impl ArcStr {
-    pub fn new(value: &str) -> Self {
-        Self(value.into())
+mod imp {
+    use super::*;
+    /// Serializable and deserializable shared string
+    #[rustfmt::skip]
+    #[derive(
+        Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Deref, DerefMut,
+        Display, DebugCustom,
+        rkyv::Archive, rkyv::Serialize, rkyv::Deserialize
+    )]
+    #[rkyv(derive(PartialEq))]
+    #[rkyv(compare(PartialEq))]
+    #[display("{}", self.0)]
+    #[debug("{:?}", self.0)]
+    #[repr(transparent)]
+    pub struct ArcStr(Arc<str>);
+    impl ArcStr {
+        pub fn new(value: &str) -> Self {
+            Self(value.into())
+        }
+    }
+    impl From<&str> for ArcStr {
+        fn from(value: &str) -> Self {
+            Self::new(value)
+        }
+    }
+    impl AsRef<str> for ArcStr {
+        fn as_ref(&self) -> &str {
+            &self.0
+        }
     }
 }
-impl From<&str> for ArcStr {
-    fn from(value: &str) -> Self {
-        Self::new(value)
-    }
-}
-impl AsRef<str> for ArcStr {
-    fn as_ref(&self) -> &str {
-        &self.0
-    }
-}
+pub use imp::ArcStr;
 
 impl Serialize for ArcStr {
     fn serialize<S: serde::Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
-        self.0.serialize(ser)
+        self.as_ref().serialize(ser)
     }
 }
 

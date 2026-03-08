@@ -17,6 +17,8 @@ dejj-utils = { path = "../utils" }
 fxhash.workspace = true
 serde.workspace = true 
 regex.workspace = true
+rkyv.workspace = true
+dashmap.workspace = true
 
 gimli = "0.32.1"
 elf = "0.8.0"

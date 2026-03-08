@@ -84,6 +84,9 @@ impl ExtractConfig {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ExtractDebugConfig {
+    /// If enabled, the l2mcache will be json instead of binary
+    #[serde(default)]
+    pub l2mcache: bool,
     /// Print lstage debug info to <outdir>/lstage.rs
     #[serde(default)]
     pub lstage: bool,

@@ -25,7 +25,6 @@ impl Config {
         let mut config = toml::parse::<Config>(&file_content)?;
         config.hash = hash;
 
-
         let base = path.parent_abs()?;
         config.paths.resolve_paths(&base)?;
 

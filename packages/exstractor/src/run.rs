@@ -12,6 +12,7 @@ use crate::dwarf_loader;
 use crate::hstage;
 use crate::lstage;
 use crate::mstage;
+use crate::stage_cache::L2mCache;
 use crate::stages::StageInfo;
 
 pub fn run(config: Config) -> cu::Result<()> {
@@ -111,6 +112,10 @@ pub fn run(config: Config) -> cu::Result<()> {
 
     let stages = {
         let compile_commands = compile_commands.clone();
+        let cache = L2mCache::open(&config)?;
+        let cache = Arc::new(cache);
+        let cache1 = Arc::clone(&cache);
+
         let stages = cu::co::run(async move {
             let bar = cu::progress("stage0 -> stage1: reducing types")
                 .total(stages.len())
@@ -119,6 +124,7 @@ pub fn run(config: Config) -> cu::Result<()> {
             let pool = cu::co::pool(-1);
             let mut output = Vec::with_capacity(stages.len());
 
+
             for stage in stages {
                 let name = &stage.name;
                 let command = cu::check!(
@@ -126,7 +132,8 @@ pub fn run(config: Config) -> cu::Result<()> {
                     "cannot find compile command for {name}"
                 )?;
                 let command = command.clone();
-                let handle = pool.spawn(async move { lstage::to_mstage(stage, command).await });
+                let cache = Arc::clone(&cache);
+                let handle = pool.spawn(async move { lstage::to_mstage(stage, command, &cache).await });
                 handles.push(handle);
             }
 
@@ -143,6 +150,7 @@ pub fn run(config: Config) -> cu::Result<()> {
 
         let cache_hit_count = stages.iter().filter(|x| x.is_cache_hit).count();
         cu::info!("stage1: l2mcache hit {} of {} compilation units", cache_hit_count, stages.len());
+        cache1.save()?;
         stages
     };
 
@@ -153,10 +161,10 @@ pub fn run(config: Config) -> cu::Result<()> {
     }
 
     let stage = hstage::from_mstage(stage)?;
-    StageInfo::hstage3(&stage).print();
-    if config.extract.debug.hstage {
-        save_debug(&stage.types, &config.paths.extract_output, "hstage");
-    }
+    // StageInfo::hstage3(&stage).print();
+    // if config.extract.debug.hstage {
+    //     save_debug(&stage.types, &config.paths.extract_output, "hstage");
+    // }
 
     cu::hint!("todo");
 

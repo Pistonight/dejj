@@ -1,55 +1,78 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cu::pre::*;
+use rkyv::Archived;
 use tyyaml::{Prim, TreeRepr};
 
-/// Global offset into DWARF
-///
-/// A Goff is used as the unique identifier for a type in one extraction run.
-/// However it is not stable across multiple DWARF outputs
-#[rustfmt::skip]
-#[derive(DebugCustom, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, From, Into, Display)]
-#[display("0x{:08x}", self.0)]
-#[debug("0x{:08x}", self.0)]
-pub struct Goff(pub usize);
+mod imp {
+    use super::*;
+
+    /// Global offset into DWARF
+    ///
+    /// A Goff is used as the unique identifier for a type in one extraction run.
+    /// However it is not stable across multiple DWARF outputs
+    #[rustfmt::skip]
+    #[derive(
+        DebugCustom, Display,
+        Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, From, Into,
+        rkyv::Archive, rkyv::Serialize, rkyv::Deserialize
+    )]
+    #[rkyv(derive(Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord))]
+    #[display("0x{:08x}", self.0)]
+    #[debug("0x{:08x}", self.0)]
+    pub struct Goff(pub usize);
+}
+
+pub use imp::Goff;
+
+impl PartialEq<Goff> for Archived<Goff> {
+    fn eq(&self, other: &Goff) -> bool {
+        self.0.to_native() == other.0 as u32
+    }
+}
+impl PartialEq<Archived<Goff>> for Goff {
+    fn eq(&self, other: &Archived<Goff>) -> bool {
+        other.0.to_native() == self.0 as u32
+    }
+}
 
 impl Goff {
     /// Get a fabricated global offset for primitive types
     pub const fn prim(p: Prim) -> Self {
         let s = match p {
-            Prim::Void => 0x1FFFF0000,
-            Prim::Bool => 0x1FFFF0001,
-            Prim::U8 => 0x1FFFF0101,
-            Prim::U16 => 0x1FFFF0102,
-            Prim::U32 => 0x1FFFF0104,
-            Prim::U64 => 0x1FFFF0108,
-            Prim::U128 => 0x1FFFF0110,
-            Prim::I8 => 0x1FFFF0201,
-            Prim::I16 => 0x1FFFF0202,
-            Prim::I32 => 0x1FFFF0204,
-            Prim::I64 => 0x1FFFF0208,
-            Prim::I128 => 0x1FFFF0210,
-            Prim::F32 => 0x1FFFF0304,
-            Prim::F64 => 0x1FFFF0308,
-            Prim::F128 => 0x1FFFF0310,
+            Prim::Void => 0xFFFF1000,
+            Prim::Bool => 0xFFFF1001,
+            Prim::U8 => 0xFFFF1101,
+            Prim::U16 => 0xFFFF1102,
+            Prim::U32 => 0xFFFF1104,
+            Prim::U64 => 0xFFFF1108,
+            Prim::U128 => 0xFFFF1110,
+            Prim::I8 => 0xFFFF1201,
+            Prim::I16 => 0xFFFF1202,
+            Prim::I32 => 0xFFFF1204,
+            Prim::I64 => 0xFFFF1208,
+            Prim::I128 => 0xFFFF1210,
+            Prim::F32 => 0xFFFF1304,
+            Prim::F64 => 0xFFFF1308,
+            Prim::F128 => 0xFFFF1310,
         };
         Self(s)
     }
 
     pub const fn pointer() -> Self {
-        Self(0x2FFFF0000)
+        Self(0xFFFF2000)
     }
 
     pub const fn ptmd() -> Self {
-        Self(0x2FFFF0001)
+        Self(0xFFFF2001)
     }
 
     pub const fn ptmf() -> Self {
-        Self(0x2FFFF0002)
+        Self(0xFFFF2002)
     }
 
     pub const fn is_prim(self) -> bool {
-        return self.0 >= 0x1FFFF0000;
+        return self.0 >= 0xFFFF0000;
     }
 }
 

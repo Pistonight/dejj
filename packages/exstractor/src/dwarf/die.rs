@@ -207,7 +207,7 @@ impl<'x> Die<'x, '_> {
         }
     }
     /// Get the DW_TAG_vtable_elem_location of a DIE (index of the entry in the vtable), return None if not virtual
-    pub fn vtable_index(&self) -> cu::Result<Option<usize>> {
+    pub fn vtable_index(&self) -> cu::Result<Option<u32>> {
         let offset = self.goff();
         let virtuality = cu::check!(
             self.entry.attr_value(DW_AT_virtuality),
@@ -236,7 +236,8 @@ impl<'x> Die<'x, '_> {
                 let vel = self
                     .unit
                     .attr_unsigned(offset, DW_AT_vtable_elem_location, velem)?;
-                Ok(Some(vel as usize))
+                cu::ensure!(vel <= u32::MAX as u64, "vtable index too big: {vel}")?;
+                Ok(Some(vel as u32))
             }
             _ => cu::bail!("expecting DW_AT_virtuality to be Virtuality, at entry {offset}"),
         }

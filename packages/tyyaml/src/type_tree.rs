@@ -1,40 +1,73 @@
 use cu::pre::*;
 
-/// A Generic Type Tree
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Tree<Repr> {
-    /// A basic type
-    ///
-    /// TyYAML representation is `[ TYPE_ID ]`
-    Base(Repr),
+mod imp {
+    /// A Generic Type Tree
+    #[derive(
+        Debug,
+        Clone,
+        PartialEq,
+        Eq,
+        PartialOrd,
+        Ord,
+        Hash,
+        rkyv::Archive,
+        rkyv::Serialize,
+        rkyv::Deserialize,
+    )]
+    #[rkyv(derive(PartialEq))]
+    #[rkyv(compare(PartialEq))]
+    #[rkyv(archive_bounds(
+        <Repr as rkyv::Archive>::Archived: PartialEq
+    ))]
+    // see https://github.com/rkyv/rkyv/blob/main/rkyv/examples/json_like_schema.rs
+    #[rkyv(serialize_bounds(
+        __S: rkyv::ser::Writer + rkyv::ser::Allocator,
+        __S::Error: rkyv::rancor::Source,
+    ))]
+    #[rkyv(deserialize_bounds(__D::Error: rkyv::rancor::Source))]
+    #[rkyv(bytecheck(
+        bounds(
+            __C: rkyv::validation::ArchiveContext,
+        )
+    ))]
+    pub enum Tree<Repr> {
+        /// A basic type
+        ///
+        /// TyYAML representation is `[ TYPE_ID ]`
+        Base(Repr),
 
-    /// An array type
-    ///
-    /// TyYAML representation is `[ TYPE_ID,[LEN] ]`
-    Array(Box<Self>, u32),
+        /// An array type
+        ///
+        /// TyYAML representation is `[ TYPE_ID,[LEN] ]`
+        Array(#[rkyv(omit_bounds)] Box<Self>, u32),
 
-    /// A pointer type
-    ///
-    /// TyYAML representation is `[ TYPE_ID,'*' ]`
-    Ptr(Box<Self>),
+        /// A pointer type
+        ///
+        /// TyYAML representation is `[ TYPE_ID,'*' ]`
+        Ptr(#[rkyv(omit_bounds)] Box<Self>),
 
-    /// A subroutine type
-    ///
-    /// TyYAML representation is `[ RET_TYPE_ID,'()',[ ARG_TYPE, ... ] ]`.
-    /// Note that this must be wrapped
-    /// in a pointer to form a pointer-to-subroutine (i.e. function pointer) type.
-    Sub(Vec<Self> /*[retty, args...]*/),
+        /// A subroutine type
+        ///
+        /// TyYAML representation is `[ RET_TYPE_ID,'()',[ ARG_TYPE, ... ] ]`.
+        /// Note that this must be wrapped
+        /// in a pointer to form a pointer-to-subroutine (i.e. function pointer) type.
+        Sub(#[rkyv(omit_bounds)] Vec<Self> /*[retty, args...]*/),
 
-    /// A pointer-to-member-data type
-    ///
-    /// TyYAML representation is `[ VALUE_TYPE_ID,CLASS_TYPE_ID,'::','*' ]`
-    Ptmd(Repr /*base*/, Box<Self> /*pointee*/),
+        /// A pointer-to-member-data type
+        ///
+        /// TyYAML representation is `[ VALUE_TYPE_ID,CLASS_TYPE_ID,'::','*' ]`
+        Ptmd(
+            Repr,                           /*base*/
+            #[rkyv(omit_bounds)] Box<Self>, /*pointee*/
+        ),
 
-    /// A pointer-to-member-function type
-    ///
-    /// TyYAML representation is `[ VALUE_TYPE_ID,CLASS_TYPE_ID,'::','()',[ ARG_TYPE, ...],'*' ]`
-    Ptmf(Repr /*base*/, Vec<Self> /*[retty, args]*/),
+        /// A pointer-to-member-function type
+        ///
+        /// TyYAML representation is `[ VALUE_TYPE_ID,CLASS_TYPE_ID,'::','()',[ ARG_TYPE, ...],'*' ]`
+        Ptmf(Repr /*base*/, #[rkyv(omit_bounds)] Vec<Self> /*[retty, args]*/),
+    }
 }
+pub use imp::Tree;
 
 impl<Repr> Tree<Repr> {
     /// Create a pointer type

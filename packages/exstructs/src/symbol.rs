@@ -4,30 +4,35 @@ use cu::pre::*;
 
 use crate::{Goff, TemplateArg};
 
-/// Information of a global symbol
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct SymbolInfo {
-    /// Address of the symbol (offset in the original binary)
-    pub address: u32,
-    /// Name for linking (linkage name)
-    pub link_name: String,
-    /// Type of the symbol. For functions, this is a Tree::Sub.
-    /// Could be unflattened depending on the stage.
-    pub ty: Tree<Goff>,
-    /// Function parameter names, if the symbol is a function.
-    /// Empty string could exists for unnamed parameters,
-    /// depending on the stage.
-    pub param_names: Vec<String>,
-    /// Function template instantiation
-    pub template_args: Vec<TemplateArg<Goff>>,
+mod imp {
+    use super::*;
+    /// Information of a global symbol
+    #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+    #[rkyv(derive(PartialEq))]
+    #[rkyv(compare(PartialEq))]
+    pub struct SymbolInfo {
+        /// Address of the symbol (offset in the original binary)
+        pub address: u32,
+        /// Name for linking (linkage name)
+        pub link_name: String,
+        /// Type of the symbol. For functions, this is a Tree::Sub.
+        /// Could be unflattened depending on the stage.
+        pub ty: Tree<Goff>,
+        /// Function parameter names, if the symbol is a function.
+        /// Empty string could exists for unnamed parameters,
+        /// depending on the stage.
+        pub param_names: Vec<String>,
+        /// Function template instantiation
+        pub template_args: Vec<TemplateArg<Goff>>,
+    }
 }
+pub use imp::SymbolInfo;
 impl SymbolInfo {
     pub fn new_data(linkage_name: String, ty: Goff) -> Self {
         Self {
             address: 0,
             link_name: linkage_name,
             ty: Tree::Base(ty),
-            // is_func: false,
             param_names: vec![],
             template_args: Default::default(),
         }
