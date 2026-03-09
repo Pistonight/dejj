@@ -12,6 +12,8 @@ pub fn run(mut stage: HStage) -> cu::Result<Vec<HStage>> {
     let bar = cu::progress("splitting type graph").spawn();
     let connected_components = algorithm::calc_connected_components(&stage.types, &stage.symbols)?;
 
+    cu::print!("{connected_components:#?}");
+
     let mut split_stages = Vec::with_capacity(connected_components.len());
     for comp in &connected_components {
         let mut split_types = GoffMap::new();

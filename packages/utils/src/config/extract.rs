@@ -31,6 +31,8 @@ pub struct ExtractConfig {
     pub debug: ExtractDebugConfig,
     /// Rules for the type parser
     pub type_parser: ExtractTypeParserConfig,
+    /// Rules for the type optimizer
+    pub type_optimizer: ExtractTypeOptimizerConfig,
     /// Rules for resolving type names
     pub name_resolution: ExtractNameResolutionConfig,
 }
@@ -106,6 +108,57 @@ pub struct ExtractTypeParserConfig {
     /// will be used instead of the typedef
     #[serde(default)]
     pub abandon_typedefs: Vec<SerdeRegex>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct ExtractTypeOptimizerConfig {
+    /// If true, a GC pass runs at the end to remove types not directly or indirectly referenced
+    /// by symbols
+    #[serde(default)]
+    pub only_keep_referenced_from_symbols: bool,
+    /// Manually select a union member to eliminate the union
+    #[serde(default)]
+    pub pick_union_member: Vec<ExtractTypeOptimizerPickUnionMemberRule>,
+    /// Manually eliminate a struct/union to an enum
+    #[serde(default)]
+    pub enumeratorize: Vec<ExtractTypeOptimizerEnumeratorizeRule>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct ExtractTypeOptimizerPickUnionMemberRule {
+    /// Regex for matching a union name. The union type will be matched
+    /// as long as any name matches this regex in the permutation of the fully-qualified
+    /// names of the type
+    pub regex: SerdeRegex,
+    /// Expected members (in this order)
+    pub members: Vec<String>,
+    /// The index of the member to pick
+    pub pick: usize,
+}
+
+/// (Struct/Union name, Enum name)
+/// When matched a struct or union type and an enum type, the struct/union will be replaced
+/// with the enum type, and give the names to the enum.
+///
+/// It is a match as long as any permutation in the fully-qualified name of the type
+/// matches the regex.
+///
+/// Checks:
+/// - There must be only one enum that match the name. There can be multiple structs,
+///   all of which will become the enum
+/// - The struct/union and enum must have the same size
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct ExtractTypeOptimizerEnumeratorizeRule(SerdeRegex, SerdeRegex);
+impl ExtractTypeOptimizerEnumeratorizeRule {
+    pub fn struct_regex(&self) -> &SerdeRegex {
+        &self.0
+    }
+    pub fn enum_regex(&self) -> &SerdeRegex {
+        &self.1
+    }
 }
 
 /// Config for name resolution for the extract command

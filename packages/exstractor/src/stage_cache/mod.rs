@@ -69,10 +69,13 @@ impl L2mCache {
         }
     }
     pub fn save(&self) -> cu::Result<()> {
-        match self {
+        let bar = cu::progress("saving l2mcache").keep(false).spawn();
+        let result = match self {
             L2mCache::Json(c) => c.save(),
             L2mCache::Binary(c) => c.save(),
-        }
+        };
+        bar.done();
+        result
     }
     fn preprocess_lstage(&self, lstage: &LStage) -> cu::Result<(String, Vec<Goff>)> {
         let cache_key = Self::cache_key(&lstage.name)?;

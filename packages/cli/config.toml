@@ -47,17 +47,23 @@ abandon-typedefs = [
     # nn::gfx::InfoType typedefs
     "^InfoType$",
 
-    # uking::Factory for both Ai factory and Action factory
+    # uking::Factory conflicts for both Ai factory and Action factory
     "^uking::Factory$",
 ]
 
-[extract.name-resolution]
-rules = []
-test = []
+[extract.type-optimizer]
+only-keep-referenced-from-symbols = false
+pick-union-member = [
+    { regex = "^std::__1::string$", members = ["__l", "__s", "__r"], pick = 0 },
+    { regex = "^fpos_t$", members = ["__opaque", "__lldata", "__align"], pick = 0 },
 
-# [extract.type-optimizer.pick-union-member]
-# "uking::ui::PouchItem::Data" = "cook"
-# "fpos_t" = "__opaque"
+    # simplify the PauseMenuDataMgr layout
+    { regex = "^uking::ui::PouchItem::Data$", members = ["cook", "weapon"], pick = 0 },
+]
+enumeratorize = [
+    # src/KingSystem/Physics/physDefines.h: ContactLayer
+    ["^ksys::phys::ContactLayer$", "^ksys::phys::ContactLayer::ValueType$"],
+]
 #
 #
 # [extract.name-resolution.override]
@@ -73,3 +79,6 @@ test = []
 #     "__clang"
 # ]
 
+[extract.name-resolution]
+rules = []
+test = []

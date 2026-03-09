@@ -1,4 +1,4 @@
 #[cu::cli]
-fn main(args: decompdb_cli::cmds::CmdMain) -> cu::Result<()> {
-    decompdb_cli::cmds::main(args)
+fn main(args: dejj_cli::cmds::CmdMain) -> cu::Result<()> {
+    dejj_cli::cmds::main(args)
 }

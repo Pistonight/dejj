@@ -113,13 +113,13 @@ pub fn run(config: Config) -> cu::Result<()> {
         save_debug(types, &config.paths.extract_output, "lstage");
     }
 
-    let stages = {
+    let (stages, save_cache_task) = {
         let compile_commands = compile_commands.clone();
         let cache = L2mCache::open(&config)?;
         let cache = Arc::new(cache);
         let cache1 = Arc::clone(&cache);
 
-        let stages = cu::co::run(async move {
+        let (stages, save_cache_task) = cu::co::run(async move {
             let bar = cu::progress("stage0 -> stage1: reducing types")
                 .total(stages.len())
                 .spawn();
@@ -148,7 +148,10 @@ pub fn run(config: Config) -> cu::Result<()> {
             }
             drop(bar);
             output.sort_unstable_by_key(|x| x.offset);
-            cu::Ok(output)
+
+            let save_cache_task = cu::co::spawn(async move {cache.save()});
+
+            cu::Ok((output, save_cache_task))
         })?;
 
         let cache_hit_count = stages.iter().filter(|x| x.is_cache_hit).count();
@@ -157,9 +160,9 @@ pub fn run(config: Config) -> cu::Result<()> {
             cache_hit_count,
             stages.len()
         );
-        cache1.save()?;
-        stages
+        (stages, save_cache_task)
     };
+
 
     let stage = cu::co::run(async move { mstage::link_mstages(stages).await })?;
     StageInfo::mstage2(&stage).print();
@@ -172,6 +175,12 @@ pub fn run(config: Config) -> cu::Result<()> {
     if config.extract.debug.hstage {
         save_debug(&stage.types, &config.paths.extract_output, "hstage");
     }
+
+    cu::co::run(async move {
+        if let Err(e) = save_cache_task.co_join().await.flatten() {
+            cu::warn!("failed to save l2mcache: {e:?}");
+        }
+    });
 
     cu::hint!("todo");
 

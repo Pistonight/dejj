@@ -22,7 +22,7 @@ impl HType {
             HType::Struct(data) => Ok(data.fqnames),
         }
     }
-    pub fn add_fqnames(&mut self, names: Vec<FullQualName>) {
+    pub fn add_fqnames(&mut self, names: &[FullQualName]) {
         let fqnames = match self {
             HType::Prim(_) => return,
             HType::Enum(data) => &mut data.fqnames,
@@ -31,8 +31,8 @@ impl HType {
         };
         let mut set = BTreeSet::new();
         set.extend(fqnames.drain(..));
-        set.extend(names);
-        fqnames.extend(set);
+        set.extend(names.iter().cloned());
+        *fqnames = set.into_iter().collect();
     }
 }
 

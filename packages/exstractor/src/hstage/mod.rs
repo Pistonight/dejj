@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use exstructs::{GoffMap, HType, HTypeData, MType, SizeMap, Struct};
+use cu::pre::*;
+use exstructs::{GoffMap, GoffSet, HType, HTypeData, MType, SizeMap, Struct};
 
 use crate::stages::{HStage, MStage};
-use cu::pre::*;
 
 mod optimize;
 mod split;
@@ -11,51 +11,34 @@ mod split;
 
 pub async fn from_mstage(stage: MStage) -> cu::Result<HStage> {
     let stage = convert_from_mstage(stage)?;
-    let stages = cu::check!(split::run(stage), "failed to split hstage")?;
-    cu::info!(
-        "there are {} connected components to optimize in the type graph",
-        stages.len()
-    );
-
-    // optimize each component in parallel
-    // it's hard to parallelize each component because the types depend on each other
-    // (and there could be circular references as well)
-    let stage = {
-        let bar = cu::progress("stage2 -> stage3: optimizing layouts")
-            .total(stages.len())
-            .spawn();
-        let pool = cu::co::pool(-1);
-        let mut handles = Vec::with_capacity(stages.len());
-        for stage in stages {
-            let handle = pool.spawn(async move { optimize::run(stage) });
-            handles.push(handle);
-        }
-
-        let mut stage = None;
-        let mut set = cu::co::set(handles);
-        while let Some(result) = set.next().await {
-            let result = cu::check!(result?, "failed to optimize types")?;
-            cu::progress!(bar += 1);
-            match &mut stage {
-                None => {
-                    stage = Some(result);
-                }
-                Some(stage) => {
-                    stage.types.extend(result.types);
-                    stage.symbols.extend(result.symbols);
-                    stage.name_graph.extend(&result.name_graph);
-                }
-            }
-        }
-        cu::check!(stage, "unexpected: there are no stages to optimize")?
+    let mut stage = {
+        cu::cli::set_thread_name("type-optimizer");
+        let result = optimize::run(stage);
+        cu::cli::reset_thread_name();
+        result?
     };
 
-    // cu::unimplemented!()
-    //
-    // cu::check!(
-    //     optimize_layout::run(&mut stage),
-    //     "failed to optimize type layouts"
-    // )?;
+    if stage.config.extract.type_optimizer.only_keep_referenced_from_symbols {
+        // starting from types referenced by any symbols, only keep referenced types
+        let mut marked = GoffSet::default();
+        for symbol in stage.symbols.values() {
+            symbol.mark(&mut marked);
+        }
+        let mut newly_marked = GoffSet::default();
+        loop {
+            newly_marked.clear();
+            for k in &marked {
+                let t = cu::check!(stage.types.get(k), "unexpected unlinked type {k} while sweeping hstage")?;
+                t.mark(*k, &mut newly_marked);
+            }
+            let len_before = marked.len();
+            marked.extend(newly_marked.iter().copied());
+            if marked.len() == len_before {
+                break;
+            }
+        }
+        stage.types.retain(|k, _| marked.contains(k));
+    }
     Ok(stage)
 }
 

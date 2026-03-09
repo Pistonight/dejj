@@ -13,17 +13,17 @@ pub trait Mark {
 
 impl HType {
     /// Mark referenced types
-    pub fn mark(&self, self_goff: Goff, marked: &mut GoffSet) {
+    pub fn mark(&self, _: Goff, marked: &mut GoffSet) {
         match self {
             Self::Prim(prim) => {
                 marked.insert(Goff::prim(*prim));
-                return; // don't mark self
             }
             Self::Enum(data) => data.mark(marked),
             Self::Union(data) => data.mark(marked),
             Self::Struct(data) => data.mark(marked),
         }
-        marked.insert(self_goff);
+        // we never mark self at HStage, since if a type is never referenced
+        // in a symbol, we should get rid of it
     }
 }
 

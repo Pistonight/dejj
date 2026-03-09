@@ -4,6 +4,7 @@ use cu::pre::*;
 
 use crate::{Goff, GoffMap, GoffSet, HType, SymbolInfo};
 
+#[derive(Debug)]
 pub struct ConnectedComponent {
     pub types: Vec<Goff>,
     pub symbols: Vec<String>,
@@ -50,9 +51,9 @@ pub fn calc_connected_components(
             let symbols_len_before = marked_symbols.len();
 
             for k in &remaining_keys {
-                if marked.contains(k) {
-                    continue;
-                }
+                // if marked.contains(k) {
+                //     continue;
+                // }
                 newly_marked.clear();
                 let t = cu::check!(
                     types.get(k),
@@ -66,9 +67,9 @@ pub fn calc_connected_components(
             }
 
             for (sym, info) in symbols {
-                if marked_symbols.contains(sym) {
-                    continue;
-                }
+                // if marked_symbols.contains(sym) {
+                //     continue;
+                // }
                 newly_marked.clear();
                 info.mark(&mut newly_marked);
                 if newly_marked.intersection(&marked).next().is_some() {

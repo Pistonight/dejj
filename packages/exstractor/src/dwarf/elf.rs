@@ -25,7 +25,7 @@ impl Dwarf {
 
         let mut dwarf = gimli::Dwarf::load(|section| {
             let section_name = section.name();
-            cu::debug!("loading ELF section {section_name}");
+            cu::trace!("loading ELF section {section_name}");
             let header = cu::check!(
                 elf_data.section_header_by_name(section_name),
                 "cannot read ELF section header for section {section_name}"
@@ -38,7 +38,7 @@ impl Dwarf {
                     EndianSlice::new(&raw_buf_ref[start..end], DwarfLittleEndian)
                 }
                 None => {
-                    cu::debug!("did not found ELF section {section_name}");
+                    cu::trace!("did not found ELF section {section_name}");
                     EndianSlice::new(&[], DwarfLittleEndian)
                 }
             };

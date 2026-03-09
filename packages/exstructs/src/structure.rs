@@ -43,6 +43,24 @@ impl HType {
             _ => cu::bail!("expected HTYPE to be struct"),
         }
     }
+    pub fn as_enum_unchecked(&self) -> &HTypeData<Enum> {
+        match self {
+            HType::Enum(data) => data,
+            _ => panic!("expected HTYPE to be enum"),
+        }
+    }
+    pub fn as_union_unchecked(&self) -> &HTypeData<Union> {
+        match self {
+            HType::Union(data) => data,
+            _ => panic!("expected HTYPE to be union"),
+        }
+    }
+    pub fn as_struct_unchecked(&self) -> &HTypeData<Struct> {
+        match self {
+            HType::Struct(data) => data,
+            _ => panic!("expected HTYPE to be struct"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

@@ -59,6 +59,28 @@ impl Goff {
         Self(s)
     }
 
+    pub const fn to_prim(self) -> Option<Prim> {
+        let s = match self.0 {
+            0xFFFF1000 => Prim::Void,
+            0xFFFF1001 => Prim::Bool,
+            0xFFFF1101 => Prim::U8,
+            0xFFFF1102 => Prim::U16,
+            0xFFFF1104 => Prim::U32,
+            0xFFFF1108 => Prim::U64,
+            0xFFFF1110 => Prim::U128,
+            0xFFFF1201 => Prim::I8,
+            0xFFFF1202 => Prim::I16,
+            0xFFFF1204 => Prim::I32,
+            0xFFFF1208 => Prim::I64,
+            0xFFFF1210 => Prim::I128,
+            0xFFFF1304 => Prim::F32,
+            0xFFFF1308 => Prim::F64,
+            0xFFFF1310 => Prim::F128,
+            _ => return None,
+        };
+        Some(s)
+    }
+
     pub const fn pointer() -> Self {
         Self(0xFFFF2000)
     }
@@ -74,6 +96,7 @@ impl Goff {
     pub const fn is_prim(self) -> bool {
         return self.0 >= 0xFFFF0000;
     }
+
 }
 
 impl Serialize for Goff {
