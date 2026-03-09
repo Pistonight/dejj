@@ -145,10 +145,13 @@ pub struct ExtractTypeOptimizerPickUnionMemberRule {
 /// It is a match as long as any permutation in the fully-qualified name of the type
 /// matches the regex.
 ///
+/// The struct/union could have different size than the enum. this is not automatically
+/// checked (basically it's expected if the struct/union is just a marker, it should
+/// never be used anyway)
+///
 /// Checks:
 /// - There must be only one enum that match the name. There can be multiple structs,
 ///   all of which will become the enum
-/// - The struct/union and enum must have the same size
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ExtractTypeOptimizerEnumeratorizeRule(SerdeRegex, SerdeRegex);

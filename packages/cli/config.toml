@@ -61,8 +61,92 @@ pick-union-member = [
     { regex = "^uking::ui::PouchItem::Data$", members = ["cook", "weapon"], pick = 0 },
 ]
 enumeratorize = [
-    # src/KingSystem/Physics/physDefines.h: ContactLayer
+    # file: src/Game/DLC/aocHardModeManager.h
+    ["^uking::aoc::HardModeManager::HardModeChange$", "^uking::aoc::HardModeManager::HardModeChange::ValueType$"],
+    ["^uking::aoc::HardModeManager::Flag$", "^uking::aoc::HardModeManager::Flag::ValueType$"],
+    ["^uking::aoc::HardModeManager::MultiplierType$", "^uking::aoc::HardModeManager::MultiplierType::ValueType$"],
+    # file: src/Game/DLC/aocManager.h
+    ["^uking::aoc::Manager::GameDataFlag$", "^uking::aoc::Manager::GameDataFlag::ValueType$"],
+    ["^uking::aoc::Manager::VersionError$", "^uking::aoc::Manager::VersionError::ValueType$"],
+
+    # file: src/KingSystem/ActorSystem/Attention/actAttention.h
+    ["^ksys::act::AttActionType$", "^ksys::act::AttActionType::ValueType$"],
+    ["^ksys::act::AttPriorityType$", "^ksys::act::AttPriorityType::ValueType$"],
+    # file: src/KingSystem/ActorSystem/Awareness/actAwareness.h
+    ["^ksys::act::Awareness::Flag$", "^ksys::act::Awareness::Flag::ValueType$"],
+    # file: src/KingSystem/Event/evtActorBinding.h
+    ["^ksys::evt::ActorBinding::ActorCreateMode$", "^ksys::evt::ActorBinding::ActorCreateMode::ValueType$"],
+    # file: src/KingSystem/GameData/gdtFlag.h
+    ["^ksys::gdt::FlagType$", "^ksys::gdt::FlagType::ValueType$"],
+    # file: src/KingSystem/Physics/physDefines.h
     ["^ksys::phys::ContactLayer$", "^ksys::phys::ContactLayer::ValueType$"],
+    ["^ksys::phys::Material$", "^ksys::phys::Material::ValueType$"],
+    ["^ksys::phys::GroundHit$", "^ksys::phys::GroundHit::ValueType$"],
+    ["^ksys::phys::FloorCode$", "^ksys::phys::FloorCode::ValueType$"],
+    ["^ksys::phys::WallCode$", "^ksys::phys::WallCode::ValueType$"],
+    # file: src/KingSystem/Physics/physMaterialMask.h
+    ["^ksys::phys::MaterialMaskData::CustomFlag$", "^ksys::phys::MaterialMaskData::CustomFlag::ValueType$"],
+    # file: src/KingSystem/Physics/System/physCharacterControllerParam.h
+    ["^ksys::phys::NavMeshCharacterType$", "^ksys::phys::NavMeshCharacterType::ValueType$"],
+    # file: src/KingSystem/Physics/System/physSystemData.h
+    ["^ksys::phys::CharacterControllerTable::Type$", "^ksys::phys::CharacterControllerTable::Type::ValueType$"],
+    # file: src/KingSystem/Resource/resUnit.h
+    ["^ksys::res::ResourceUnit::Status$", "^ksys::res::ResourceUnit::Status::ValueType$"],
+    # file: src/KingSystem/Resource/Actor/resResourceDamageParam.h
+    ["^ksys::res::DamageParam::DamageSize$", "^ksys::res::DamageParam::DamageSize::ValueType$"],
+    ["^ksys::res::DamageParam::DamageSource$", "^ksys::res::DamageParam::DamageSource::ValueType$"],
+
+    # file: src/KingSystem/Sound/sndMusicInfo.h
+    ["^ksys::snd::EnvBgmInfo::EnvTimeEnum$", "^ksys::snd::EnvBgmInfo::EnvTimeEnum::ValueType$"],
+    ["^ksys::snd::TemperatureBgmInfo::TemperatureEnum$", "^ksys::snd::TemperatureBgmInfo::TemperatureEnum::ValueType$"],
+    ["^ksys::snd::DragonBgmInfo::DragonEnum$", "^ksys::snd::DragonBgmInfo::DragonEnum::ValueType$"],
+    ["^ksys::snd::EnvPaletteReactiveBgmInfo::EnvPaletteReactiveBgmEnum$", "^ksys::snd::EnvPaletteReactiveBgmInfo::EnvPaletteReactiveBgmEnum::ValueType$"],
+    # file: src/KingSystem/System/ProductReporter.h
+    ["^ksys::PlayReportKey$", "^ksys::PlayReportKey::ValueType$"],
+    # file: src/KingSystem/World/worldDefines.h
+    ["^ksys::world::DungeonSize$", "^ksys::world::DungeonSize::ValueType$"],
+    ["^ksys::world::DungeonType$", "^ksys::world::DungeonType::ValueType$"],
+    # file: src/KingSystem/World/worldTimeMgr.h
+    ["^ksys::world::TimeType$", "^ksys::world::TimeType::ValueType$"],
+    ["^ksys::world::TimeDivision$", "^ksys::world::TimeDivision::ValueType$"],
+
+    # file: lib/EventFlow/include/evfl/Action.h
+    ["^evfl::TriggerType$", "^evfl::TriggerType::Type$"],
+    # file: lib/EventFlow/include/evfl/Flowchart.h
+    ["^evfl::SubFlowCallbackType$", "^evfl::SubFlowCallbackType::Type$"],
+    ["^evfl::FlowchartContextMode::State$", "^evfl::FlowchartContextMode::State::Type$"],
+    ["^evfl::FlowchartContext::Builder::BuildResultType$", "^evfl::FlowchartContext::Builder::BuildResultType::Type$"],
+    # file: lib/EventFlow/include/evfl/Param.h
+    ["^evfl::MetaDataPack::DataType$", "^evfl::MetaDataPack::DataType::Type$"],
+    # file: lib/EventFlow/include/evfl/Query.h
+    ["^evfl::QueryValueType$", "^evfl::QueryValueType::Type$"],
+    # file: lib/EventFlow/include/evfl/ResFlowchart.h
+    ["^evfl::ResEvent::EventType$", "^evfl::ResEvent::EventType::Type$"],
+    # file: lib/EventFlow/include/evfl/TimelineObj.h
+    ["^evfl::TimelineState$", "^evfl::TimelineState::Type$"],
+    # file: lib/EventFlow/include/ore/ResMetaData.h
+    ["^ore::ResMetaData::DataType$", "^ore::ResMetadata::DataType::Type$"],
+    ["^ore::ResUserData::DataType$", "^ore::ResUserData::DataType::Type$"],
+
+    # file: lib/gsys/src/gsys/gsysModelSceneConfig.cpp
+    ["^gsys::DepthFormat$", "^gsys::DepthFormat::ValueType$"],
+    ["^gsys::DepthShadowMapFormat$", "^gsys::DepthShadowMapFormat::ValueType$"],
+
+    # file: lib/sead/include/devenv/seadEnvUtil.h
+    ["^sead::RegionID$", "^sead::RegionID::ValueType$"],
+    ["^sead::RegionLanguageID$", "^sead::RegionLanguageID::ValueType$"],
+    # file: lib/sead/include/heap/seadHeap.h
+    ["^sead::Heap::Flag$", "^sead::Heap::Flag::ValueType$"],
+    # file: lib/sead/include/mc/seadCoreInfo.h
+    ["^sead::CoreId$", "^sead::CoreId::ValueType$"],
+    # file: lib/sead/include/mc/seadJobQueue.h
+    ["^sead::SyncType$", "^sead::SyncType::ValueType$"],
+    # file: lib/sead/include/mc/seadWorker.h
+    ["^sead::JobQueuePushType$", "^sead::JobQueuePushType::ValueType$"],
+    ["^sead::Worker::State$", "^sead::Worker::State::ValueType$"],
+    # file: lib/sead/include/thread/seadThread.h
+    ["^sead::Thread::State$", "^sead::Thread::State::ValueType$"],
+
 ]
 #
 #

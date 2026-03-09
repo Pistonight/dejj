@@ -105,10 +105,6 @@ pub fn enumeratorize(
         };
         let error_prefix = format!("{error_prefix} matched name {enum_name} in enum {enum_k} and name {struct_name} in struct/union {struct_k}, but");
 
-        // must have the same size as the enum
-        if stage.sizes.get(enum_k)? != stage.sizes.get(struct_k)? {
-            cu::bail!("{error_prefix} the struct/union and the enum have different sizes");
-        }
         let replace_tree = Tree::Base(enum_k);
         if !util::check_eliminate(stage, struct_k, &replace_tree, ctx)? {
             cu::bail!("{error_prefix} the struct/union cannot be eliminated");

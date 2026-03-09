@@ -23,5 +23,5 @@ shell-words.workspace = true
 dashmap.workspace = true
 
 [[bin]]
-name = "decompdb"
+name = "dejj"
 path = "src/main.rs"
