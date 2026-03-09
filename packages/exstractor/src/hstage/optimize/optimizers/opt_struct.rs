@@ -67,7 +67,6 @@ pub fn enumeratorize(
             rule.struct_regex(),
             rule.enum_regex(),
         );
-        cu::debug!("running {error_prefix}");
 
         // find an enum that matches the rule
         let enum_goff_iter = stage.types.iter().filter_map(|(k, v)| {
@@ -81,7 +80,6 @@ pub fn enumeratorize(
             " failed to match an enum")?;
         let Some((enum_k, enum_name)) = matched_enum else {
             // the rule did not match any enum
-            cu::debug!("did not match enum");
             continue;
         };
         let error_prefix2 = format!("{error_prefix} matched name {enum_name} in enum {enum_k}, but");
@@ -100,7 +98,6 @@ pub fn enumeratorize(
         )?;
         // we only produce one change at a time, so only look at the first match
         let Some((struct_k, struct_name)) = matched_structs.into_iter().next() else {
-            cu::debug!("did not match struct");
             continue;
         };
         let error_prefix = format!("{error_prefix} matched name {enum_name} in enum {enum_k} and name {struct_name} in struct/union {struct_k}, but");
@@ -109,7 +106,7 @@ pub fn enumeratorize(
         if !util::check_eliminate(stage, struct_k, &replace_tree, ctx)? {
             cu::bail!("{error_prefix} the struct/union cannot be eliminated");
         }
-        cu::print!("enumeratorize {struct_k} ({struct_name}) into {enum_k} ({enum_name})");
+        cu::debug!("enumeratorize {struct_k} ({struct_name}) into {enum_k} ({enum_name})");
         util::eliminate_unchecked_and_give_names_to_base(
             stage, struct_k, &replace_tree
         )?;

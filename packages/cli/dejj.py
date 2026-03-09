@@ -10,7 +10,7 @@ SELF_DIR = os.path.dirname(SELF_PATH)
 CONFIG_PATH = os.path.join(SELF_DIR, "config.toml")
 DEJJ_INSTALL_PATH = os.path.abspath(os.path.join(SELF_DIR, "../../target/release"))
 DEJJ_PATH = os.path.join(DEJJ_INSTALL_PATH, "dejj")
-DEJJ_REPO = "https://github.com/Pistonite/dejj"
+DEJJ_REPO = "https://github.com/Pistonight/dejj"
 DEJJ_BUILD_OR_INSTALL = "BUILD"
 DEJJ_VERSION = "0.1.0"
 PROJECT_DIR = os.path.abspath(os.path.join(SELF_DIR, "../../../botw-decomp"))
@@ -47,7 +47,7 @@ def ensure_dejj():
 
 def invoke_dejj(args):
     cmd = [DEJJ_PATH, "-C", CONFIG_PATH] + args
-    print("running: " + " ".join(cmd))
+    # print("running: " + " ".join(cmd))
     subprocess.run(cmd, check=True)
 
 

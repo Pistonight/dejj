@@ -59,8 +59,8 @@ pub fn number_of_members(
                 // then, eliminate this union to be the base type
                 let member1 = &data.members[0];
                 let member2 = &data.members[1];
-                let member1_is_basety = matches!(member1.ty, Tree::Base(_));
-                let member2_is_basety = matches!(member2.ty, Tree::Base(_));
+                let member1_is_basety = matches!(member1.ty, Tree::Base(k) if !k.is_prim());
+                let member2_is_basety = matches!(member2.ty, Tree::Base(k) if !k.is_prim());
                 if member1_is_basety == member2_is_basety {
                     continue;
                 }
@@ -191,7 +191,7 @@ pub fn pick_member(
         if !util::check_eliminate(stage, k, &member.ty, ctx)? {
             cu::bail!("{error_prefix} the type cannot be eliminated");
         }
-        cu::print!("picking member {} for union {} ({})", rule.members[rule.pick], k, name);
+        cu::debug!("picking member {} for union {} ({})", rule.members[rule.pick], k, name);
         // must clone so we can re-borrow stage as mutable
         let member = member.clone();
         util::eliminate_unchecked_and_give_names_to_base(

@@ -57,7 +57,10 @@ pick-union-member = [
     { regex = "^std::__1::string$", members = ["__l", "__s", "__r"], pick = 0 },
     { regex = "^fpos_t$", members = ["__opaque", "__lldata", "__align"], pick = 0 },
 
-    # simplify the PauseMenuDataMgr layout
+    # below may not be technically accurate, but simplifies the layout so the output
+    # is nicer in most cases in the decompiler
+    { regex = "^nn::util::BinTPtr<", members = ["_offset", "_ptr"], pick = 1 },
+    { regex = "^nn::util::Bin.+Signature$", members = ["_str", "_packed"], pick = 0 },
     { regex = "^uking::ui::PouchItem::Data$", members = ["cook", "weapon"], pick = 0 },
 ]
 enumeratorize = [
