@@ -1,16 +1,16 @@
 use cu::pre::*;
 use exstructs::algorithm::FullQualPermutater;
-use exstructs::{FullQualName, FullQualNameMap, GoffMap, HType, HTypeData, NamespacedName, NamespacedTemplatedGoffName, NamespacedTemplatedName, Struct};
+use exstructs::{
+    FullQualName, FullQualNameMap, GoffMap, HType, HTypeData, NamespacedName,
+    NamespacedTemplatedGoffName, NamespacedTemplatedName, Struct,
+};
 use tyyaml::Tree;
 
 use crate::hstage::optimize::{OptimizeContext, util};
 use crate::stages::HStage;
 
 /// Based on number of union members, optimize the union
-pub fn number_of_members(
-    stage: &mut HStage,
-    ctx: &OptimizeContext,
-) -> cu::Result<bool> {
+pub fn number_of_members(stage: &mut HStage, ctx: &OptimizeContext) -> cu::Result<bool> {
     for (k, t) in &stage.types {
         let HType::Union(HTypeData { data, .. }) = t else {
             continue;
@@ -47,9 +47,7 @@ pub fn number_of_members(
                 cu::trace!("removing single-member union {k}");
                 // must clone so we can re-borrow stage as mutable
                 let member = member.clone();
-                util::eliminate_unchecked_and_give_names_to_base(
-                    stage, k, &member.ty
-                )?;
+                util::eliminate_unchecked_and_give_names_to_base(stage, k, &member.ty)?;
                 return Ok(true);
             }
             2 => {
@@ -68,7 +66,8 @@ pub fn number_of_members(
                 let mut m = 2;
                 if member1_is_basety && stage.sizes.get_tree(&member1.ty)? == data.byte_size {
                     m = 0;
-                } else if member2_is_basety && stage.sizes.get_tree(&member2.ty)? == data.byte_size {
+                } else if member2_is_basety && stage.sizes.get_tree(&member2.ty)? == data.byte_size
+                {
                     m = 1;
                 }
                 if m == 2 {
@@ -82,11 +81,8 @@ pub fn number_of_members(
                 cu::trace!("removing dual-member union {k} as member {m}");
                 // must clone so we can re-borrow stage as mutable
                 let member = member.clone();
-                util::eliminate_unchecked_and_give_names_to_base(
-                    stage, k, &member.ty
-                )?;
+                util::eliminate_unchecked_and_give_names_to_base(stage, k, &member.ty)?;
                 return Ok(true);
-
             }
             _ => {}
         }
@@ -95,10 +91,7 @@ pub fn number_of_members(
 }
 
 /// If all members of the union are of the same type, optimize the union out
-pub fn same_type_members(
-    stage: &mut HStage,
-    ctx: &OptimizeContext,
-) -> cu::Result<bool> {
+pub fn same_type_members(stage: &mut HStage, ctx: &OptimizeContext) -> cu::Result<bool> {
     'outmost: for (k, t) in &stage.types {
         let HType::Union(HTypeData { data, .. }) = t else {
             continue;
@@ -119,19 +112,14 @@ pub fn same_type_members(
         cu::debug!("removing all-same-type-member union {k}");
         // must clone so we can re-borrow stage as mutable
         let member = member.clone();
-        util::eliminate_unchecked_and_give_names_to_base(
-            stage, k, &member.ty
-        )?;
+        util::eliminate_unchecked_and_give_names_to_base(stage, k, &member.ty)?;
         return Ok(true);
     }
     Ok(false)
 }
 
 /// Pick union member based on config
-pub fn pick_member(
-    stage: &mut HStage,
-    ctx: &OptimizeContext,
-) -> cu::Result<bool> {
+pub fn pick_member(stage: &mut HStage, ctx: &OptimizeContext) -> cu::Result<bool> {
     let rules = &stage.config.extract.type_optimizer.pick_union_member;
     if rules.is_empty() {
         // save the cost of computing permutated names
@@ -142,10 +130,7 @@ pub fn pick_member(
     let mut permutater = FullQualPermutater::new(&fullqual_names);
 
     for rule in rules {
-        let error_prefix = format!(
-            "type-optimizer.pick-union-member rule '{}'",
-            rule.regex
-        );
+        let error_prefix = format!("type-optimizer.pick-union-member rule '{}'", rule.regex);
         let goff_iter = stage.types.iter().filter_map(|(k, v)| {
             if matches!(v, HType::Union(_)) {
                 Some(k)
@@ -153,14 +138,15 @@ pub fn pick_member(
                 None
             }
         });
-        let matched = cu::check!(util::match_unique_fqname(&mut permutater, &rule.regex, goff_iter), "{error_prefix} failed to match")?;
+        let matched = cu::check!(
+            util::match_unique_fqname(&mut permutater, &rule.regex, goff_iter),
+            "{error_prefix} failed to match"
+        )?;
         let Some((k, name)) = matched else {
             continue;
         };
         let data = &stage.types.get(&k).unwrap().as_union_unchecked().data;
-        let error_prefix = format!(
-            "{error_prefix} matched name {name:?} in type {k}, but",
-        );
+        let error_prefix = format!("{error_prefix} matched name {name:?} in type {k}, but",);
 
         let mut matched = true;
         if rule.members.len() == data.members.len() {
@@ -180,9 +166,16 @@ pub fn pick_member(
             }
         }
         if !matched {
-            cu::bail!("{error_prefix} the members don't match: {:?} != {:#?}", rule.members, data.members);
+            cu::bail!(
+                "{error_prefix} the members don't match: {:?} != {:#?}",
+                rule.members,
+                data.members
+            );
         }
-        let member = cu::check!(data.members.get(rule.pick), "{error_prefix} the rule has an out of bound pick")?;
+        let member = cu::check!(
+            data.members.get(rule.pick),
+            "{error_prefix} the rule has an out of bound pick"
+        )?;
 
         if data.byte_size != stage.sizes.get_tree(&member.ty)? {
             cu::bail!("{error_prefix} the picked member and the union have different sizes");
@@ -191,12 +184,15 @@ pub fn pick_member(
         if !util::check_eliminate(stage, k, &member.ty, ctx)? {
             cu::bail!("{error_prefix} the type cannot be eliminated");
         }
-        cu::debug!("picking member {} for union {} ({})", rule.members[rule.pick], k, name);
+        cu::debug!(
+            "picking member {} for union {} ({})",
+            rule.members[rule.pick],
+            k,
+            name
+        );
         // must clone so we can re-borrow stage as mutable
         let member = member.clone();
-        util::eliminate_unchecked_and_give_names_to_base(
-            stage, k, &member.ty
-        )?;
+        util::eliminate_unchecked_and_give_names_to_base(stage, k, &member.ty)?;
         return Ok(true);
     }
 

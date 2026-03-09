@@ -4,7 +4,12 @@ use cu::pre::*;
 #[derive(Clone, Deref, DerefMut, Display, DebugCustom)]
 #[display("{}", self.0)]
 #[debug("Regex({})", self.0)]
-pub struct SerdeRegex(String, #[deref] #[deref_mut] regex::Regex);
+pub struct SerdeRegex(
+    String,
+    #[deref]
+    #[deref_mut]
+    regex::Regex,
+);
 impl SerdeRegex {
     /// Get the string that this regex was created from
     pub fn to_str(&self) -> &str {

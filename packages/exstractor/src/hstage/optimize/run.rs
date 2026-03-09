@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
-use crate::stages::HStage;
 use crate::hstage::optimize::{OPTIMIZERS, OptimizeContext};
-
+use crate::stages::HStage;
 
 /// Optimize (simplify) type layouts
 pub fn run(mut stage: HStage) -> cu::Result<HStage> {

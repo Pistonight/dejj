@@ -70,7 +70,7 @@ pub fn main(args: CmdMain) -> cu::Result<()> {
 
     match cmd {
         CmdSubcommand::Extract(_) => exstractor::run(config),
-        CmdSubcommand::Version(_) => Ok(())
+        CmdSubcommand::Version(_) => Ok(()),
     }
 }
 

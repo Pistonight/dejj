@@ -3,16 +3,20 @@
 use cu::pre::*;
 use tyyaml::Tree;
 
-use crate::{FullQualName, Goff, HType, HTypeData, Member, NameSeg, Namespace, NamespacedName, NamespacedTemplatedGoffName, NamespacedTemplatedName, Struct, SymbolInfo, TemplateArg, Union, VtableEntry};
+use crate::{
+    FullQualName, Goff, HType, HTypeData, Member, NameSeg, Namespace, NamespacedName,
+    NamespacedTemplatedGoffName, NamespacedTemplatedName, Struct, SymbolInfo, TemplateArg, Union,
+    VtableEntry,
+};
 
 impl HType {
     pub fn replace(&mut self, k: Goff, replacement: &Tree<Goff>) -> cu::Result<bool> {
         let mut changed = false;
         match self {
             Self::Prim(_) => {}
-            Self::Enum(HTypeData { fqnames, .. }) |
-            Self::Union(HTypeData { fqnames, .. }) |
-            Self::Struct(HTypeData { fqnames, .. }) => {
+            Self::Enum(HTypeData { fqnames, .. })
+            | Self::Union(HTypeData { fqnames, .. })
+            | Self::Struct(HTypeData { fqnames, .. }) => {
                 fqnames.retain_mut(|name| {
                     // replace goff in the name
                     match name.replace(k, replacement) {
@@ -167,18 +171,19 @@ impl NameSeg {
     pub fn replace(&mut self, k: Goff, replacement: &Tree<Goff>) -> cu::Result<bool> {
         match self {
             NameSeg::Name(_) => Ok(false),
-            NameSeg::Type(goff, _) |
-            NameSeg::Subprogram(goff, _, _) => {
+            NameSeg::Type(goff, _) | NameSeg::Subprogram(goff, _, _) => {
                 if *goff != k {
                     return Ok(false);
                 }
                 let Tree::Base(replacement) = replacement else {
-                    cu::bail!("cannot replace {k} with {replacement:?} because it is used in a fullqual name");
+                    cu::bail!(
+                        "cannot replace {k} with {replacement:?} because it is used in a fullqual name"
+                    );
                 };
                 *goff = *replacement;
                 Ok(true)
             }
-            NameSeg::Anonymous => Ok(false)
+            NameSeg::Anonymous => Ok(false),
         }
     }
 }
@@ -228,7 +233,11 @@ fn tree_replace(tree: &mut Tree<Goff>, k: Goff, replacement: &Tree<Goff>) -> cu:
     }
 }
 
-fn tree_replace_name(tree: &mut Tree<NamespacedTemplatedName>, k: Goff, replacement: &Tree<Goff>) -> cu::Result<bool> {
+fn tree_replace_name(
+    tree: &mut Tree<NamespacedTemplatedName>,
+    k: Goff,
+    replacement: &Tree<Goff>,
+) -> cu::Result<bool> {
     let result = tree.to_replaced(|x| {
         let mut replaced = x.clone();
         if let Ok(true) = replaced.replace(k, replacement) {

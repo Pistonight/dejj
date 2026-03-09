@@ -149,7 +149,7 @@ pub fn run(config: Config) -> cu::Result<()> {
             drop(bar);
             output.sort_unstable_by_key(|x| x.offset);
 
-            let save_cache_task = cu::co::spawn(async move {cache.save()});
+            let save_cache_task = cu::co::spawn(async move { cache.save() });
 
             cu::Ok((output, save_cache_task))
         })?;
@@ -162,7 +162,6 @@ pub fn run(config: Config) -> cu::Result<()> {
         );
         (stages, save_cache_task)
     };
-
 
     let stage = cu::co::run(async move { mstage::link_mstages(stages).await })?;
     StageInfo::mstage2(&stage).print();

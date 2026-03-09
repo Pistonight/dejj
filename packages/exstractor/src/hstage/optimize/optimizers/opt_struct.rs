@@ -6,12 +6,8 @@ use tyyaml::Tree;
 use crate::hstage::optimize::{OptimizeContext, util};
 use crate::stages::HStage;
 
-
 /// Eliminate structs with only one member
-pub fn single_member(
-    stage: &mut HStage,
-    ctx: &OptimizeContext,
-) -> cu::Result<bool> {
+pub fn single_member(stage: &mut HStage, ctx: &OptimizeContext) -> cu::Result<bool> {
     for (k, t) in &stage.types {
         let HType::Struct(HTypeData { data, .. }) = t else {
             continue;
@@ -40,19 +36,14 @@ pub fn single_member(
         let member = member.clone();
         // note that we give the name to the member anyway, even though
         // it might not be declared as base
-        util::eliminate_unchecked_and_give_names_to_base(
-            stage, k, &member.ty
-        )?;
+        util::eliminate_unchecked_and_give_names_to_base(stage, k, &member.ty)?;
         return Ok(true);
     }
     Ok(false)
 }
 
 /// Eliminate struct/union into the associate Enum type
-pub fn enumeratorize(
-    stage: &mut HStage,
-    ctx: &OptimizeContext,
-) -> cu::Result<bool> {
+pub fn enumeratorize(stage: &mut HStage, ctx: &OptimizeContext) -> cu::Result<bool> {
     let rules = &stage.config.extract.type_optimizer.enumeratorize;
     if rules.is_empty() {
         // save the cost of computing permutated names
@@ -76,13 +67,16 @@ pub fn enumeratorize(
                 None
             }
         });
-        let matched_enum = cu::check!(util::match_unique_fqname(&mut permutater, rule.enum_regex(), enum_goff_iter),
-            " failed to match an enum")?;
+        let matched_enum = cu::check!(
+            util::match_unique_fqname(&mut permutater, rule.enum_regex(), enum_goff_iter),
+            " failed to match an enum"
+        )?;
         let Some((enum_k, enum_name)) = matched_enum else {
             // the rule did not match any enum
             continue;
         };
-        let error_prefix2 = format!("{error_prefix} matched name {enum_name} in enum {enum_k}, but");
+        let error_prefix2 =
+            format!("{error_prefix} matched name {enum_name} in enum {enum_k}, but");
 
         // match all structs/unions
         let struct_goff_iter = stage.types.iter().filter_map(|(k, v)| {
@@ -100,18 +94,17 @@ pub fn enumeratorize(
         let Some((struct_k, struct_name)) = matched_structs.into_iter().next() else {
             continue;
         };
-        let error_prefix = format!("{error_prefix} matched name {enum_name} in enum {enum_k} and name {struct_name} in struct/union {struct_k}, but");
+        let error_prefix = format!(
+            "{error_prefix} matched name {enum_name} in enum {enum_k} and name {struct_name} in struct/union {struct_k}, but"
+        );
 
         let replace_tree = Tree::Base(enum_k);
         if !util::check_eliminate(stage, struct_k, &replace_tree, ctx)? {
             cu::bail!("{error_prefix} the struct/union cannot be eliminated");
         }
         cu::debug!("enumeratorize {struct_k} ({struct_name}) into {enum_k} ({enum_name})");
-        util::eliminate_unchecked_and_give_names_to_base(
-            stage, struct_k, &replace_tree
-        )?;
+        util::eliminate_unchecked_and_give_names_to_base(stage, struct_k, &replace_tree)?;
         return Ok(true);
-        
     }
     Ok(false)
 }

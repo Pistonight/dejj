@@ -126,7 +126,9 @@ impl Namespace {
         self.0.iter().any(|x| x == &NameSeg::Anonymous)
     }
     pub fn contains_offsets(&self) -> bool {
-        self.0.iter().any(|x| matches!(x, NameSeg::Type(_, _) | NameSeg::Subprogram(_, _, _)))
+        self.0
+            .iter()
+            .any(|x| matches!(x, NameSeg::Type(_, _) | NameSeg::Subprogram(_, _, _)))
     }
     pub fn source_segs_equal(&self, other: &Self) -> bool {
         if self.0.len() != other.0.len() {

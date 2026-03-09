@@ -61,7 +61,10 @@ impl Config {
                 cu::bail!("pick-union-member rule has empty members: {}", rule.regex);
             }
             if rule.pick >= rule.members.len() {
-                cu::bail!("pick-union-member rule has a pick out of bound: {}", rule.regex);
+                cu::bail!(
+                    "pick-union-member rule has a pick out of bound: {}",
+                    rule.regex
+                );
             }
         }
 

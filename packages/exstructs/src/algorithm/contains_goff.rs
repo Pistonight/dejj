@@ -5,14 +5,10 @@ use crate::{Goff, HType, Member, Struct, SymbolInfo, TemplateArg, Union, VtableE
 impl HType {
     pub fn contains_goff(&self, k: Goff) -> bool {
         match self {
-            Self::Prim(_) => {false}
-            Self::Enum(_) => {false}
-            Self::Union(data) => {
-                data.data.contains_goff(k)
-            }
-            Self::Struct(data) => {
-                data.data.contains_goff(k)
-            }
+            Self::Prim(_) => false,
+            Self::Enum(_) => false,
+            Self::Union(data) => data.data.contains_goff(k),
+            Self::Struct(data) => data.data.contains_goff(k),
         }
     }
 }

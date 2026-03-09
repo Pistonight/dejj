@@ -1,6 +1,8 @@
 use cu::pre::*;
-use exstructs::{FullQualName, FullQualNameMap, Goff, GoffMap, GoffSet, NamespacedName, NamespacedTemplatedName};
 use exstructs::algorithm::FullQualPermutater;
+use exstructs::{
+    FullQualName, FullQualNameMap, Goff, GoffMap, GoffSet, NamespacedName, NamespacedTemplatedName,
+};
 use regex::Regex;
 use tyyaml::Tree;
 
@@ -19,7 +21,7 @@ pub struct Optimizer {
     /// Name of the optimizer
     pub name: &'static str,
     /// Optimize function type
-    pub f: fn(&mut HStage, &OptimizeContext) -> cu::Result<bool /* changed */>
+    pub f: fn(&mut HStage, &OptimizeContext) -> cu::Result<bool /* changed */>,
 }
 impl Optimizer {
     pub fn run(self, stage: &mut HStage, ctx: &OptimizeContext) -> cu::Result<bool> {
@@ -28,8 +30,11 @@ impl Optimizer {
 }
 macro_rules! make_optimizer {
     ($fn:expr) => {
-        $crate::hstage::optimize::Optimizer { name: stringify!($fn), f: $fn }
-    }
+        $crate::hstage::optimize::Optimizer {
+            name: stringify!($fn),
+            f: $fn,
+        }
+    };
 }
 pub(crate) use make_optimizer;
 
@@ -41,11 +46,16 @@ pub struct OptimizeContext {
 
 #[cu::context("failed to eliminate and merge with base (type={elim_k}, replace={replace:#?})")]
 pub fn eliminate_unchecked_and_give_names_to_base(
-    stage: &mut HStage, elim_k: Goff, replace: &Tree<Goff>
+    stage: &mut HStage,
+    elim_k: Goff,
+    replace: &Tree<Goff>,
 ) -> cu::Result<()> {
     eliminate_unchecked(stage, elim_k, replace)?;
     // remove this type in the stage
-    let t = cu::check!(stage.types.remove(&elim_k), "unexpected: type {elim_k} was already removed")?;
+    let t = cu::check!(
+        stage.types.remove(&elim_k),
+        "unexpected: type {elim_k} was already removed"
+    )?;
     // give the names to inner type
     if let Tree::Base(member_goff) = &replace {
         let mut fqnames = t.into_fqnames()?;
@@ -61,7 +71,10 @@ pub fn eliminate_unchecked_and_give_names_to_base(
 
 #[cu::context("failed to check_eliminate (type={elim_k}, replace={replace:#?})")]
 pub fn check_eliminate(
-    stage: &HStage, elim_k: Goff, replace: &Tree<Goff>, ctx: &OptimizeContext
+    stage: &HStage,
+    elim_k: Goff,
+    replace: &Tree<Goff>,
+    ctx: &OptimizeContext,
 ) -> cu::Result<bool> {
     if !matches!(replace, Tree::Base(_)) {
         // replacing with a composite type
@@ -71,7 +84,9 @@ pub fn check_eliminate(
         }
     }
     if replace.contains(&elim_k) {
-        cu::bail!("replacement tree contains the type to replace: tree: {replace:#?}, contains: {elim_k}");
+        cu::bail!(
+            "replacement tree contains the type to replace: tree: {replace:#?}, contains: {elim_k}"
+        );
     }
     for (k, t) in &stage.types {
         if *k == elim_k {
@@ -84,7 +99,7 @@ pub fn check_eliminate(
         }
     }
     for si in stage.symbols.values() {
-        if si.contains_goff(elim_k)  {
+        if si.contains_goff(elim_k) {
             return Ok(true);
         }
     }
@@ -97,7 +112,9 @@ pub fn check_eliminate(
 /// Must call check_eliminate first to check if the type can be eliminated
 #[cu::context("failed to eliminate_unchecked (type={elim_k}, replace={replace:#?})")]
 pub fn eliminate_unchecked(
-    stage: &mut HStage, elim_k: Goff, replace: &Tree<Goff>
+    stage: &mut HStage,
+    elim_k: Goff,
+    replace: &Tree<Goff>,
 ) -> cu::Result<()> {
     for (k, t) in &mut stage.types {
         if *k == elim_k {
@@ -131,7 +148,10 @@ pub fn give_names_to_base(
         // no names to give
         return Ok(false);
     }
-    let base_t = cu::check!(stage.types.get_mut(&base_goff), "unexpected unlinked type {base_goff} while giving names to base")?;
+    let base_t = cu::check!(
+        stage.types.get_mut(&base_goff),
+        "unexpected unlinked type {base_goff} while giving names to base"
+    )?;
     let Ok(base_fqnames) = base_t.fqnames() else {
         // base is a primitive
         return Ok(false);
@@ -150,10 +170,11 @@ pub fn compute_fqnames(stage: &HStage) -> cu::Result<FullQualNameMap> {
     let mut fullqual_names = GoffMap::default();
     for (k, t) in &stage.types {
         if let Some(prim) = k.to_prim() {
-            fullqual_names.insert(*k, 
+            fullqual_names.insert(
+                *k,
                 vec![FullQualName::Name(NamespacedTemplatedName::new(
                     NamespacedName::prim(prim),
-                ))]
+                ))],
             );
             continue;
         };
@@ -165,7 +186,7 @@ pub fn compute_fqnames(stage: &HStage) -> cu::Result<FullQualNameMap> {
 pub fn match_unique_fqname<'a>(
     permutater: &mut FullQualPermutater,
     regex: &Regex,
-    goffs: impl Iterator<Item=&'a Goff>,
+    goffs: impl Iterator<Item = &'a Goff>,
 ) -> cu::Result<Option<(Goff, String)>> {
     let matched = match_fqname(permutater, regex, goffs)?;
     if matched.is_empty() {
@@ -179,7 +200,7 @@ pub fn match_unique_fqname<'a>(
 pub fn match_fqname<'a>(
     permutater: &mut FullQualPermutater,
     regex: &Regex,
-    goffs: impl Iterator<Item=&'a Goff>,
+    goffs: impl Iterator<Item = &'a Goff>,
 ) -> cu::Result<Vec<(Goff, String)>> {
     // there shouldn't be too many matches, most of the times only 1
     let mut matched = Vec::with_capacity(8);

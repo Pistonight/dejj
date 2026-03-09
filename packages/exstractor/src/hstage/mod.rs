@@ -18,7 +18,12 @@ pub async fn from_mstage(stage: MStage) -> cu::Result<HStage> {
         result?
     };
 
-    if stage.config.extract.type_optimizer.only_keep_referenced_from_symbols {
+    if stage
+        .config
+        .extract
+        .type_optimizer
+        .only_keep_referenced_from_symbols
+    {
         // starting from types referenced by any symbols, only keep referenced types
         let mut marked = GoffSet::default();
         for symbol in stage.symbols.values() {
@@ -28,7 +33,10 @@ pub async fn from_mstage(stage: MStage) -> cu::Result<HStage> {
         loop {
             newly_marked.clear();
             for k in &marked {
-                let t = cu::check!(stage.types.get(k), "unexpected unlinked type {k} while sweeping hstage")?;
+                let t = cu::check!(
+                    stage.types.get(k),
+                    "unexpected unlinked type {k} while sweeping hstage"
+                )?;
                 t.mark(*k, &mut newly_marked);
             }
             let len_before = marked.len();

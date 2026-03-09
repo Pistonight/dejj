@@ -1,5 +1,5 @@
 mod util;
-pub use util::{Optimizer, OptimizeContext};
+pub use util::{OptimizeContext, Optimizer};
 mod run;
 pub use run::run;
 mod optimizers;

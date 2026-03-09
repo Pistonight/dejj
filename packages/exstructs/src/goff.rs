@@ -96,7 +96,6 @@ impl Goff {
     pub const fn is_prim(self) -> bool {
         return self.0 >= 0xFFFF0000;
     }
-
 }
 
 impl Serialize for Goff {
